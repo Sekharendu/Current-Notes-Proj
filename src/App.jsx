@@ -1,11 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback  } from 'react'
 import { supabase } from './supabaseClient'
 import { Sidebar, SidebarTabs } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
 import { EditorPane } from './components/EditorPane'
 import './index.css'
 
+  const SLASH_COMMANDS = [
+    { label: 'Heading 1', command: 'h1' },
+    { label: 'Heading 2', command: 'h2' },
+    { label: 'Heading 3', command: 'h3' },
+    { label: 'Bold', command: 'bold' },
+    { label: 'Italic', command: 'italic' },
+    { label: 'Strikethrough', command: 'strike' },
+    { label: 'Highlight', command: 'highlight' },
+    { label: 'Bullet List', command: 'bullet' },
+    { label: 'Numbered List', command: 'numbered' },
+    { label: 'Code Block', command: 'code' },
+  ]
 function App() {
+  const slashInsertPosRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState(SidebarTabs.ALL)
   const [folders, setFolders] = useState([])
@@ -22,7 +35,9 @@ function App() {
   const [editor,setEditor]=useState()
   const [menu, setMenu] = useState(null);
   const [content,setContent]=useState('');
-  
+  const [slashMenuIndex, setSlashMenuIndex] = useState(0) // ← keyboard nav index
+
+
 
   const applyCommand= (command)=>{
     const chain=editor.chain().focus();
@@ -105,34 +120,46 @@ const handleContextMenu = (e) => {
   }, 0)
 }
 
-  const handleSlashKey = (e) => {
-    const rect = editor.options.element.getBoundingClientRect();
-    setMenu({ x: e.clientX, y: e.clientY, type: 'slash' });
-    setTimeout(() => {
-    const closeOnNextClick = () => {
-      setMenu(null)
-      document.removeEventListener('click', closeOnNextClick)
-    }
-    document.addEventListener('click', closeOnNextClick)
-  }, 0)
-  };
+  // const handleSlashKey = (e) => {
+  //   const rect = editor.options.element.getBoundingClientRect();
+  //   setMenu({ x: e.clientX, y: e.clientY, type: 'slash' });
+  //   setTimeout(() => {
+  //   const closeOnNextClick = () => {
+  //     setMenu(null)
+  //     document.removeEventListener('click', closeOnNextClick)
+  //   }
+  //   document.addEventListener('click', closeOnNextClick)
+  // }, 0)
+  // };
+
+  // const visibleNotes = useMemo(() => {
+  //   let list = notes
+  //   if (activeTab === SidebarTabs.FAVORITES) {
+  //     list = list.filter((n) => n.is_favorite)
+  //   }
+  //   if (selectedFolderId) {
+  //     list = list.filter((n) => n.folder_id === selectedFolderId)
+  //   }
+  //   if (search.trim()) {
+  //     const q = search.toLowerCase()
+  //     list = list.filter(
+  //       (n) => n.title?.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q),
+  //     )
+  //   }
+  //   return list
+  // }, [notes, activeTab, selectedFolderId, search])
+
 
   const visibleNotes = useMemo(() => {
-    let list = notes
-    if (activeTab === SidebarTabs.FAVORITES) {
-      list = list.filter((n) => n.is_favorite)
-    }
-    if (selectedFolderId) {
-      list = list.filter((n) => n.folder_id === selectedFolderId)
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (n) => n.title?.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q),
-      )
-    }
-    return list
-  }, [notes, activeTab, selectedFolderId, search])
+  let list = notes
+  if (activeTab === SidebarTabs.FAVORITES) list = list.filter((n) => n.is_favorite)
+  if (selectedFolderId) list = list.filter((n) => n.folder_id === selectedFolderId)
+  if (search.trim()) {
+    const q = search.toLowerCase()
+    list = list.filter((n) => n.title?.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q))
+  }
+  return list
+}, [notes, activeTab, selectedFolderId, search])
 
   const selectedNote = notes.find((n) => n.id === selectedNoteId) ?? visibleNotes[0] ?? null
 
@@ -378,6 +405,75 @@ const handleContextMenu = (e) => {
     }
   }
 
+    // const applySlashCommand = (command) => {
+    //   if (!editor) return
+    //   // Delete the slash character that triggered the menu
+    //   editor.chain().focus().deleteRange({
+    //     from: editor.state.selection.from - 1,
+    //     to: editor.state.selection.from,
+    //   }).run()
+    //   applyCommand(command)
+    // }
+
+const handleSlashKey = useCallback((cursorCoords) => {
+  // ✅ Save the editor position AT THE TIME slash was pressed
+  if (editor) {
+    slashInsertPosRef.current = editor.state.selection.from
+  }
+  setSlashMenuIndex(0)
+  setMenu({ x: cursorCoords.x, y: cursorCoords.y, type: 'slash' })
+  setTimeout(() => {
+    const closeOnNextClick = () => {
+      setMenu(null)
+      document.removeEventListener('click', closeOnNextClick)
+    }
+    document.addEventListener('click', closeOnNextClick)
+  }, 0)
+}, [editor])
+
+// Fix applySlashCommand to use the saved position
+const applySlashCommand = (command) => {
+  if (!editor) return
+  const pos = slashInsertPosRef.current
+  if (pos !== null) {
+    // ✅ Delete the '/' using the position saved when slash was pressed
+    // pos is BEFORE the slash was inserted, so after insertion it's at pos
+    // The slash is now at pos (0-indexed from when it was typed)
+    editor.chain().focus().deleteRange({
+      from: pos,      // position of the '/' character
+      to: pos + 1,    // one character forward
+    }).run()
+  }
+  applyCommand(command)
+  slashInsertPosRef.current = null
+}
+
+    // Keyboard navigation handler — passed to EditorPane so it can intercept
+  // ArrowUp/Down/Enter/Escape while the slash menu is open
+  const handleSlashMenuKeyDown = useCallback((e) => {
+    if (!menu || menu.type !== 'slash') return false
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSlashMenuIndex((prev) => (prev + 1) % SLASH_COMMANDS.length)
+      return true
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSlashMenuIndex((prev) => (prev - 1 + SLASH_COMMANDS.length) % SLASH_COMMANDS.length)
+      return true
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      applySlashCommand(SLASH_COMMANDS[slashMenuIndex].command)
+      return true
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setMenu(null)
+      return true
+    }
+    return false
+  }, [menu, slashMenuIndex])
   // const applySlashCommand = (command) => {
   //   if (!editorRef.current) return
   //   editorRef.current.focus()
@@ -492,6 +588,7 @@ const handleContextMenu = (e) => {
           onChangeTab={setActiveTab}
           folders={folders}
           notes={notes}
+          search={search}
           selectedFolderId={selectedFolderId}
           onSelectFolder={setSelectedFolderId}
           selectedNoteId={selectedNoteId}
@@ -527,20 +624,31 @@ const handleContextMenu = (e) => {
             }
           />
 
-          <EditorPane
+          {/* <EditorPane
             content={content}
             loading={loading}
             selectedNote={selectedNote}
             onCreateNote={handleCreateNote}
             onTitleChange={handleTitleChange}
             editorRef={editorRef}
-            // onEditorChange={handleEditorInput}
-            // onEditorChange={setContent}
             onEditorChange={(html) => updateNoteContent({ content: html })}
             onEditorKeyDown={handleEditorKeyDown}
             onEditorContextMenu={openEditorMenu}
             onSlashKey={handleSlashKey}
             onContextMenu={handleContextMenu}
+            setEditorInstance={setEditor}
+          /> */}
+          <EditorPane
+            loading={loading}
+            selectedNote={selectedNote}
+            onCreateNote={handleCreateNote}
+            onTitleChange={handleTitleChange}
+            editorRef={editorRef}
+            onEditorChange={(html) => updateNoteContent({ content: html })}
+            onSlashKey={handleSlashKey}
+            onContextMenu={handleContextMenu}
+            onSlashMenuKeyDown={handleSlashMenuKeyDown}
+            isSlashMenuOpen={menu?.type === 'slash'}
             setEditorInstance={setEditor}
           />
         </main>
@@ -578,248 +686,39 @@ const handleContextMenu = (e) => {
         </div>
       )}
 
-      {/* Editor selection menu */}
-      {/* {editorMenu && (
-        <div
-          className="fixed z-40 grid w-56 grid-cols-2 gap-1 rounded-md border border-slate-800 bg-slate-900/95 p-2 text-[11px] text-slate-100 shadow-soft"
-          style={{ top: editorMenu.y, left: editorMenu.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('h1')}
-          >
-            Heading 1
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('h2')}
-          >
-            Heading 2
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('h3')}
-          >
-            Heading 3
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('h4')}
-          >
-            Heading 4
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('body')}
-          >
-            Body
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('bold')}
-          >
-            Bold
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('italic')}
-          >
-            Italisc
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('strike')}
-          >
-            Strikethrough
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('highlight')}
-          >
-            Highlight
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => document.execCommand('cut')}
-          >
-            Cut
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => document.execCommand('copy')}
-          >
-            Copy
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => document.execCommand('paste')}
-          >
-            Paste
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('bullet')}
-          >
-            Bulleted List
-          </button>
-          <button
-            type="button"
-            className="rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('numbered')}
-          >
-            Numbered List
-          </button>
-          <button
-            type="button"
-            className="col-span-2 rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applyFormatting('clear')}
-          >
-            Clear Formatting
-          </button>
-        </div>
-      )} */}
 
-      {/* Slash menu */}
-      {/* {slashMenu && (
-        <div
-          className="fixed z-40 w-56 rounded-md border border-slate-800 bg-slate-900/95 p-1 text-[11px] text-slate-100 shadow-soft"
-          style={{ top: slashMenu.y, left: slashMenu.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-slate-500">
-            Insert
-          </div>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('code')}
-          >
-            Code Block
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('formula')}
-          >
-            Formula Block
-          </button>
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-slate-500">
-            Text
-          </div>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('h1')}
-          >
-            Heading 1
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('h2')}
-          >
-            Heading 2
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('h3')}
-          >
-            Heading 3
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('h4')}
-          >
-            Heading 4
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('body')}
-          >
-            Body
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('bold')}
-          >
-            Bold
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('italic')}
-          >
-            Italisc
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('strike')}
-          >
-            Strikethrough
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('highlight')}
-          >
-            Highlight
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('bullet')}
-          >
-            Bulleted List
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-sm px-2 py-1 text-left hover:bg-slate-800"
-            onClick={() => applySlashCommand('numbered')}
-          >
-            Numbered List
-          </button>
-        </div>
-      )} */}
-
+      {/* Context + Slash unified menu */}
       {menu && (
-        <div 
-          className="fixed z-50 w-48 rounded-lg border border-slate-700 bg-slate-800 p-1 shadow-xl"
-          style={{ top: menu.y, left: menu.x }}
+        <div
+          className="fixed z-50 w-52 rounded-lg border border-slate-700 bg-slate-800 p-1 shadow-xl"
+          style={{ top: menu.y + 24, left: menu.x }}
           onClick={(e) => e.stopPropagation()}
         >
           {menu.type === 'context' ? (
             <>
-              <button onClick={() => applyCommand('h1')} className="menu-btn">Heading 1</button>
-              <button onClick={() => applyCommand('h2')} className="menu-btn">Heading 2</button>
-              <button onClick={() => applyCommand('bold')} className="menu-btn font-bold">Bold</button>
-              <button onClick={() => applyCommand('italic')} className="menu-btn italic">Italic</button>
-              <button onClick={() => applyCommand('highlight')} className="menu-btn text-yellow-400">Highlight</button>
-              <button onClick={() => applyCommand('clear')} className="menu-btn text-rose-400 border-t border-slate-700 mt-1">Clear All</button>
+              <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Format</p>
+              <button onClick={() => applyCommand('h1')} className="menu-btn w-full text-left px-3 py-1.5 hover:bg-slate-700 rounded text-sm">Heading 1</button>
+              <button onClick={() => applyCommand('h2')} className="menu-btn w-full text-left px-3 py-1.5 hover:bg-slate-700 rounded text-sm">Heading 2</button>
+              <button onClick={() => applyCommand('bold')} className="menu-btn w-full text-left px-3 py-1.5 hover:bg-slate-700 rounded text-sm font-bold">Bold</button>
+              <button onClick={() => applyCommand('italic')} className="menu-btn w-full text-left px-3 py-1.5 hover:bg-slate-700 rounded text-sm italic">Italic</button>
+              <button onClick={() => applyCommand('highlight')} className="menu-btn w-full text-left px-3 py-1.5 hover:bg-slate-700 rounded text-sm text-yellow-400">Highlight</button>
+              <div className="my-1 border-t border-slate-600" />
+              <button onClick={() => applyCommand('clear')} className="menu-btn w-full text-left px-3 py-1.5 hover:bg-slate-700 rounded text-sm text-rose-400">Clear All</button>
             </>
           ) : (
             <>
-              <div className="px-3 py-1 text-[10px] uppercase text-slate-500">Insert Block</div>
-              <button onClick={() => applyCommand('code')} className="menu-btn font-mono">Code Block</button>
-              <button onClick={() => applyCommand('math')} className="menu-btn font-serif">Math Formula</button>
+              <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Insert</p>
+              {SLASH_COMMANDS.map((item, i) => (
+                <button
+                  key={item.command}
+                  onClick={() => applySlashCommand(item.command)}
+                  className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors ${
+                    i === slashMenuIndex ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-100'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
             </>
           )}
         </div>
