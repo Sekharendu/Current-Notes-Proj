@@ -14,6 +14,7 @@ export function Sidebar({
   onChangeTab,
   folders,
   notes,
+  search,
   selectedFolderId,
   onSelectFolder,
   selectedNoteId,
@@ -28,6 +29,14 @@ export function Sidebar({
   openFolders,
   onToggleFolderOpen,
 }) {
+
+  const displayNotes = notes
+  .filter((n) => activeTab === SidebarTabs.FAVORITES ? n.is_favorite : true)
+  .filter((n) => search.trim()
+    ? n.title?.toLowerCase().includes(search.toLowerCase()) ||
+      n.content?.toLowerCase().includes(search.toLowerCase())
+    : true
+  )
   return (
     <aside className="flex w-72 flex-col border-r border-slate-800 bg-black/40 backdrop-blur-xl">
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
@@ -100,7 +109,7 @@ export function Sidebar({
           onSelectFolder(null)
         }}
       >
-        {folders.map((folder) => (
+        {activeTab === SidebarTabs.ALL && folders.map((folder) => (
           <div key={folder.id} className="mb-1">
             {editingItem && editingItem.kind === 'folder' && editingItem.id === folder.id ? (
               <div className="flex items-center rounded-md px-2 py-1.5 text-xs text-slate-300">
@@ -131,7 +140,7 @@ export function Sidebar({
                   e.stopPropagation()
                   onToggleFolderOpen(folder.id)
                   onSelectFolder(folder.id)
-                  onSelectNote(null)
+                  // onSelectNote(null)
                 }}
                 onContextMenu={(e) => onSidebarContext(e, { type: 'folder', folder })}
                 className={classNames(
@@ -200,8 +209,8 @@ export function Sidebar({
         ))}
 
         <div className="mt-2 border-t border-slate-800/70 pt-2">
-          {notes
-            .filter((n) => !n.folder_id)
+          {displayNotes
+            .filter((n) => activeTab === SidebarTabs.FAVORITES ? true : !n.folder_id)
             .map((note) => (
               (editingItem &&
               editingItem.kind === 'note' &&
