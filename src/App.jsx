@@ -36,7 +36,7 @@ function App() {
   const [menu, setMenu] = useState(null);
   const [content,setContent]=useState('');
   const [slashMenuIndex, setSlashMenuIndex] = useState(0) // ← keyboard nav index
-
+const [sidebarOpen, setSidebarOpen] = useState(true)
 
 
   const applyCommand= (command)=>{
@@ -151,14 +151,14 @@ const handleContextMenu = (e) => {
 
 
   const visibleNotes = useMemo(() => {
-  let list = notes
-  if (activeTab === SidebarTabs.FAVORITES) list = list.filter((n) => n.is_favorite)
-  if (selectedFolderId) list = list.filter((n) => n.folder_id === selectedFolderId)
-  if (search.trim()) {
-    const q = search.toLowerCase()
-    list = list.filter((n) => n.title?.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q))
-  }
-  return list
+    let list = notes
+    if (activeTab === SidebarTabs.FAVORITES) list = list.filter((n) => n.is_favorite)
+    if (selectedFolderId) list = list.filter((n) => n.folder_id === selectedFolderId)
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter((n) => n.title?.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q))
+    }
+    return list
 }, [notes, activeTab, selectedFolderId, search])
 
   const selectedNote = notes.find((n) => n.id === selectedNoteId) ?? visibleNotes[0] ?? null
@@ -588,7 +588,6 @@ const applySlashCommand = (command) => {
           onChangeTab={setActiveTab}
           folders={folders}
           notes={notes}
-          search={search}
           selectedFolderId={selectedFolderId}
           onSelectFolder={setSelectedFolderId}
           selectedNoteId={selectedNoteId}
@@ -606,9 +605,11 @@ const applySlashCommand = (command) => {
 
         <main className="flex flex-1 flex-col bg-slate-950/60 backdrop-blur-xl">
           <TopBar
+            notes={notes}
             search={search}
             onChangeSearch={setSearch}
             selectedNote={selectedNote}
+             onSelectNote={setSelectedNoteId} 
             onDeleteNote={handleDeleteNote}
             onOpenMenu={(e) =>
               setSidebarContext((prev) =>
