@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Highlight from '@tiptap/extension-highlight'
 import Mathematics from '@tiptap/extension-mathematics'
+import { Star, Trash2 } from 'lucide-react'  // ✅ import icons
 import 'katex/dist/katex.min.css'
 
 export function EditorPane({
@@ -15,6 +16,8 @@ export function EditorPane({
   onContextMenu,
   onSlashMenuKeyDown,
   isSlashMenuOpen,
+  onToggleFavorite,   // ✅ new prop
+  onDeleteNote,
   setEditorInstance,
 }) {
   const isSlashMenuOpenRef = useRef(isSlashMenuOpen)
@@ -39,11 +42,61 @@ export function EditorPane({
       editorProps: {
         handleDOMEvents: {
           contextmenu: (view, event) => {
+            // ✅ Use event target to check if right-click is inside a code block DOM element
+            const target = event.target
+            const isInCodeBlock = target.closest('pre') !== null || 
+                                  target.closest('code') !== null ||
+                                  view.state.selection.$from.parent.type.name === 'codeBlock'
+            
+            if (isInCodeBlock) {
+              event.preventDefault()
+              return true
+            }
+
             onContextMenuRef.current(event)
             return false
           },
+
           keydown: (view, event) => {
-            if (isSlashMenuOpenRef.current) {
+            const { $from } = view.state.selection
+            // ✅ Walk up the node tree to check if anywhere in a code block
+            let isInCodeBlock = false
+            let depth = $from.depth
+            while (depth >= 0) {
+              if ($from.node(depth).type.name === 'codeBlock') {
+                isInCodeBlock = true
+                break
+              }
+              depth--
+            }
+
+            // ✅ Tab inside code block
+            if (event.key === 'Tab') {
+              if (isInCodeBlock) {
+                event.preventDefault()
+                view.dispatch(view.state.tr.insertText('    ').scrollIntoView())
+                return true
+              }
+              return false
+            }
+
+            // ✅ Slash inside code block — just let it type, skip menu entirely
+            if (event.key === '/') {
+              if (isInCodeBlock) return false
+              // not in code block — open slash menu
+              setTimeout(() => {
+                const selection = window.getSelection()
+                if (selection && selection.rangeCount > 0) {
+                  const range = selection.getRangeAt(0)
+                  const rect = range.getBoundingClientRect()
+                  onSlashKeyRef.current({ x: rect.left, y: rect.bottom })
+                }
+              }, 0)
+              return false
+            }
+
+            // ✅ Slash menu keyboard nav (only when not in code block)
+            if (!isInCodeBlock && isSlashMenuOpenRef.current) {
               const handled = onSlashMenuKeyDownRef.current(event)
               if (handled) return true
               if (event.key === 'Backspace') {
@@ -53,21 +106,7 @@ export function EditorPane({
                 onSlashMenuKeyDownRef.current({ key: 'Escape', preventDefault: () => {} })
               }
             }
-if (event.key === '/') {
-  setTimeout(() => {
-    const selection = window.getSelection()
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0)
-      const rect = range.getBoundingClientRect()
-      // ✅ Pass cursor position FROM editor state AFTER '/' is inserted
-      onSlashKeyRef.current({ 
-        x: rect.left, 
-        y: rect.bottom,
-        editorPos: null // will be set in App via editor.state
-      })
-    }
-  }, 0)
-}
+
             return false
           },
         },
@@ -114,26 +153,73 @@ if (event.key === '/') {
     )
   }
 
-  return (
+return (
     <section className="flex-1 min-h-0 overflow-hidden flex flex-col">
       <div
         className="flex flex-col flex-1 min-h-0 px-16 py-8"
         style={{ background: '#0f0f0f' }}
       >
-        {/* Title */}
-        <input
-          type="text"
-          value={selectedNote.title || ''}
-          onChange={onTitleChange}
-          className="mb-1 w-full bg-transparent text-3xl font-bold tracking-tight focus:outline-none"
-          style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-          }}
-          placeholder="Untitled"
-        />
+        {/* ✅ Header row — title + icons */}
+        <div className="flex items-start justify-between mb-1 gap-4">
+          <input
+            type="text"
+            value={selectedNote.title || ''}
+            onChange={onTitleChange}
+            className="flex-1 bg-transparent text-3xl font-bold tracking-tight focus:outline-none"
+            style={{
+              background: 'linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+            placeholder="Untitled"
+          />
+
+          {/* ✅ Action icons */}
+          <div className="flex items-center gap-1 pt-2 flex-shrink-0">
+            {/* Favorite toggle */}
+            <button
+              type="button"
+              onClick={() => onToggleFavorite(selectedNote)}
+              className="flex items-center justify-center h-8 w-8 rounded-md transition-colors"
+              style={{ color: selectedNote.is_favorite ? '#eab308' : '#444444' }}
+              onMouseEnter={(e) => {
+                if (!selectedNote.is_favorite) e.currentTarget.style.color = '#888888'
+                e.currentTarget.style.background = '#1a1a1a'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = selectedNote.is_favorite ? '#eab308' : '#444444'
+                e.currentTarget.style.background = 'transparent'
+              }}
+              title={selectedNote.is_favorite ? 'Remove from favourites' : 'Add to favourites'}
+            >
+              <Star
+                size={18}
+                fill={selectedNote.is_favorite ? '#eab308' : 'none'}
+                strokeWidth={1.75}
+              />
+            </button>
+
+            {/* Delete note */}
+            <button
+              type="button"
+              onClick={() => onDeleteNote(selectedNote.id)}
+              className="flex items-center justify-center h-8 w-8 rounded-md transition-colors"
+              style={{ color: '#444444' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#f87171'
+                e.currentTarget.style.background = '#1a1a1a'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#444444'
+                e.currentTarget.style.background = 'transparent'
+              }}
+              title="Delete note"
+            >
+              <Trash2 size={18} strokeWidth={1.75} />
+            </button>
+          </div>
+        </div>
 
         {/* Last edited */}
         <p className="mb-6 text-xs" style={{ color: '#3a3a3a' }}>

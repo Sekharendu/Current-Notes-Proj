@@ -38,6 +38,9 @@ function App() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
 
+  const CONTEXT_MENU_HEIGHT = 260  // accurate height for 6 buttons + label + divider
+  const SLASH_MENU_HEIGHT = 220    // 5 visible items + label + scroll
+
   // ── Auth ──────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -102,6 +105,13 @@ function App() {
   const handleContextMenu = (e) => {
     e.preventDefault()
     e.stopPropagation()
+
+    // ✅ Don't open context menu inside code block
+    if (editor) {
+      const isInCodeBlock = editor.state.selection.$from.parent.type.name === 'codeBlock'
+      if (isInCodeBlock) return
+    }
+
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed || selection.toString().trim() === '') return
     setMenu({ x: e.clientX, y: e.clientY, type: 'context' })
@@ -297,8 +307,8 @@ function App() {
   const clearMenus = () => { closeSidebarContext(); setMenu(null) }
 
   // ── Smart menu positioning ────────────────────────────────────────
-  const menuHeight = menu?.type === 'context' ? 220 : 320
-  const showAbove = menu ? (window.innerHeight - menu.y) < menuHeight + 20 : false
+  const menuHeight = menu?.type === 'context' ? CONTEXT_MENU_HEIGHT : SLASH_MENU_HEIGHT
+  const showAbove = menu ? (window.innerHeight - menu.y) < menuHeight + 40 : false
 
   // ── Early returns ─────────────────────────────────────────────────
   if (authLoading) {
@@ -368,6 +378,8 @@ function App() {
             onSlashMenuKeyDown={handleSlashMenuKeyDown}
             isSlashMenuOpen={menu?.type === 'slash'}
             setEditorInstance={setEditor}
+             onToggleFavorite={handleToggleFavorite}  // ✅ add
+  onDeleteNote={handleDeleteNote}
           />
         </main>
       </div>
@@ -392,7 +404,7 @@ function App() {
         <div
           className="fixed z-50 w-52 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] p-1 shadow-xl"
           style={{
-            top: showAbove ? menu.y - menuHeight : menu.y + 24,
+            top: showAbove ? menu.y - menuHeight : menu.y + 8, // ✅ +8 instead of +24 — closer to cursor
             left: Math.min(menu.x, window.innerWidth - 220),
           }}
           onClick={(e) => e.stopPropagation()}
@@ -406,22 +418,24 @@ function App() {
               <button onClick={() => applyCommand('italic')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm italic">Italic</button>
               <button onClick={() => applyCommand('highlight')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm text-yellow-400">Highlight</button>
               <div className="my-1 border-t border-[#2a2a2a]" />
-              <button onClick={() => applyCommand('clear')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm text-rose-400">Clear All</button>
+              <button onClick={() => applyCommand('clear')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm text-rose-400">Clear Formatting</button>
             </>
           ) : (
             <>
-              <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Insert</p>
-              {SLASH_COMMANDS.map((item, i) => (
-                <button
-                  key={item.command}
-                  onClick={() => applySlashCommand(item.command)}
-                  className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors ${
-                    i === slashMenuIndex ? 'bg-indigo-600 text-white' : 'hover:bg-[#2a2a2a] text-slate-100'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+              <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Format</p>
+              <div className="max-h-[160px] overflow-y-auto scroll-thin">
+                {SLASH_COMMANDS.map((item, i) => (
+                  <button
+                    key={item.command}
+                    onClick={() => applySlashCommand(item.command)}
+                    className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors ${
+                      i === slashMenuIndex ? 'bg-indigo-600 text-white' : 'hover:bg-[#2a2a2a] text-slate-100'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+                </div>
             </>
           )}
         </div>
