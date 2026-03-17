@@ -5,6 +5,7 @@ import { TopBar } from './components/TopBar'
 import { EditorPane } from './components/EditorPane'
 import './index.css'
 import { Auth } from './components/Auth'
+import { Star } from 'lucide-react'
 
 const SLASH_COMMANDS = [
   { label: 'Heading 1', command: 'h1' },
@@ -392,7 +393,8 @@ function App() {
           onClick={(e) => e.stopPropagation()}
         >
           <button type="button" className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('favorite')}>
-            <span>Add to Favourites</span><span>★</span>
+            <span>Add to Favourites</span>
+            <Star size={12} />
           </button>
           <button type="button" className="w-full px-3 py-1.5 text-left hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('rename')}>Rename</button>
           <button type="button" className="w-full px-3 py-1.5 text-left text-rose-400 hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('delete')}>Delete</button>
