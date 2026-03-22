@@ -38,6 +38,10 @@ function App() {
   const [slashMenuIndex, setSlashMenuIndex] = useState(0)
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [sidebarWidth, setSidebarWidth] = useState(288) // 288px = w-72
+  const isDraggingRef = useRef(false)
+  const MIN_SIDEBAR = 180
+  const MAX_SIDEBAR = 480
 
   const CONTEXT_MENU_HEIGHT = 260  // accurate height for 6 buttons + label + divider
   const SLASH_MENU_HEIGHT = 220    // 5 visible items + label + scroll
@@ -60,8 +64,12 @@ function App() {
     const load = async () => {
       setLoading(true)
       const [{ data: foldersData }, { data: notesData }] = await Promise.all([
-        supabase.from('folders').select('*').order('created_at', { ascending: true }),
-        supabase.from('notes').select('*').order('updated_at', { ascending: false }),
+        supabase.from('folders').select('*')
+          .eq('user_id', user.id)  // ✅ only this user's folders
+          .order('created_at', { ascending: true }),
+        supabase.from('notes').select('*')
+          .eq('user_id', user.id)  // ✅ only this user's notes
+          .order('updated_at', { ascending: false }),
       ])
       setFolders(foldersData ?? [])
       setNotes(notesData ?? [])
@@ -74,6 +82,47 @@ function App() {
   }, [user])
 
   // ── Handlers ──────────────────────────────────────────────────────
+  
+  // Add drag handlers
+  const handleDragStart = (e) => {
+    isDraggingRef.current = true
+    e.preventDefault()
+
+    const onMouseMove = (e) => {
+      if (!isDraggingRef.current) return
+      const newWidth = Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, e.clientX))
+      setSidebarWidth(newWidth)
+    }
+
+    const onMouseUp = () => {
+      isDraggingRef.current = false
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }
+
+  // Touch support for mobile drag
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0]
+    
+    const onTouchMove = (e) => {
+      const touch = e.touches[0]
+      const newWidth = Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, touch.clientX))
+      setSidebarWidth(newWidth)
+    }
+
+    const onTouchEnd = () => {
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend', onTouchEnd)
+    }
+
+    document.addEventListener('touchmove', onTouchMove)
+    document.addEventListener('touchend', onTouchEnd)
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setUser(null)
@@ -324,8 +373,16 @@ function App() {
 
   // ── Render ────────────────────────────────────────────────────────
   return (
-<div className="flex h-screen overflow-hidden bg-[#0f0f0f] text-slate-100">
-  <div className="flex w-full h-full" onClick={clearMenus}>
+  // ✅ CHANGED: h-screen → height:100dvh (fixes mobile browser bar)
+  <div className="flex overflow-hidden text-slate-100"
+    style={{ background: '#0f0f0f', height: '100dvh' }}>
+    <div className="flex w-full h-full" onClick={clearMenus}>
+
+      {/* ✅ CHANGED: sidebar now has dynamic width instead of fixed w-72 */}
+      <div
+        className="flex-shrink-0 overflow-hidden"
+        style={{ width: `${sidebarWidth}px` }}
+      >
         <Sidebar
           activeTab={activeTab}
           onChangeTab={setActiveTab}
@@ -346,104 +403,119 @@ function App() {
           onCancelEditing={handleCancelEditing}
           openFolders={openFolders}
           onToggleFolderOpen={handleToggleFolderOpen}
+          onCloseSidebarContext={closeSidebarContext}
         />
-
-<main className="flex flex-1 flex-col bg-[#0f0f0f] min-h-0 overflow-hidden">
-          <TopBar
-            notes={notes}
-            search={search}
-            onChangeSearch={setSearch}
-            selectedNote={selectedNote}
-            onSelectNote={setSelectedNoteId}
-            onDeleteNote={handleDeleteNote}
-            user={user}
-            onLogout={handleLogout}
-            onOpenMenu={(e) =>
-              setSidebarContext((prev) =>
-                prev && prev.special === 'top' ? null : {
-                  special: 'top', x: e.clientX, y: e.clientY + 10,
-                  item: { type: 'note', note: selectedNote },
-                }
-              )
-            }
-          />
-          <EditorPane
-            loading={loading}
-            selectedNote={selectedNote}
-            onCreateNote={handleCreateNote}
-            onTitleChange={handleTitleChange}
-            editorRef={editorRef}
-            onEditorChange={(html) => updateNoteContent({ content: html })}
-            onSlashKey={handleSlashKey}
-            onContextMenu={handleContextMenu}
-            onSlashMenuKeyDown={handleSlashMenuKeyDown}
-            isSlashMenuOpen={menu?.type === 'slash'}
-            setEditorInstance={setEditor}
-             onToggleFavorite={handleToggleFavorite}  // ✅ add
-  onDeleteNote={handleDeleteNote}
-          />
-        </main>
       </div>
 
-      {/* Sidebar context menu */}
-      {sidebarContext && (
+      {/* ✅ NEW: drag handle between sidebar and editor */}
+      <div
+        className="flex-shrink-0 w-1 cursor-col-resize flex items-center justify-center group"
+        style={{ background: '#1a1a1a' }}
+        onMouseDown={handleDragStart}
+        onTouchStart={handleTouchStart}
+      >
         <div
-          className="fixed z-40 w-40 rounded-md border border-[#2a2a2a] bg-[#1a1a1a] text-xs text-slate-100 shadow-xl"
-          style={{ top: sidebarContext.y, left: sidebarContext.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button type="button" className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('favorite')}>
-            <span>Add to Favourites</span>
-            <Star size={12} />
-          </button>
-          <button type="button" className="w-full px-3 py-1.5 text-left hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('rename')}>Rename</button>
-          <button type="button" className="w-full px-3 py-1.5 text-left text-rose-400 hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('delete')}>Delete</button>
-        </div>
-      )}
+          className="w-0.5 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ background: '#444444' }}
+        />
+      </div>
 
-      {/* Context + Slash menu */}
-      {menu && (
-        <div
-          className="fixed z-50 w-52 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] p-1 shadow-xl"
-          style={{
-            top: showAbove ? menu.y - menuHeight : menu.y + 8, // ✅ +8 instead of +24 — closer to cursor
-            left: Math.min(menu.x, window.innerWidth - 220),
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {menu.type === 'context' ? (
-            <>
-              <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Format</p>
-              <button onClick={() => applyCommand('h1')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm">Heading 1</button>
-              <button onClick={() => applyCommand('h2')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm">Heading 2</button>
-              <button onClick={() => applyCommand('bold')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm font-bold">Bold</button>
-              <button onClick={() => applyCommand('italic')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm italic">Italic</button>
-              <button onClick={() => applyCommand('highlight')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm text-yellow-400">Highlight</button>
-              <div className="my-1 border-t border-[#2a2a2a]" />
-              <button onClick={() => applyCommand('clear')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm text-rose-400">Clear Formatting</button>
-            </>
-          ) : (
-            <>
-              <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Format</p>
-              <div className="max-h-[160px] overflow-y-auto scroll-thin">
-                {SLASH_COMMANDS.map((item, i) => (
-                  <button
-                    key={item.command}
-                    onClick={() => applySlashCommand(item.command)}
-                    className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors ${
-                      i === slashMenuIndex ? 'bg-indigo-600 text-white' : 'hover:bg-[#2a2a2a] text-slate-100'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-                </div>
-            </>
-          )}
-        </div>
-      )}
+      <main className="flex flex-1 flex-col bg-[#1a1a1a] min-h-0 overflow-hidden">
+        <TopBar
+          notes={notes}
+          search={search}
+          onChangeSearch={setSearch}
+          selectedNote={selectedNote}
+          onSelectNote={setSelectedNoteId}
+          onDeleteNote={handleDeleteNote}
+          user={user}
+          onLogout={handleLogout}
+          onOpenMenu={(e) =>
+            setSidebarContext((prev) =>
+              prev && prev.special === 'top' ? null : {
+                special: 'top', x: e.clientX, y: e.clientY + 10,
+                item: { type: 'note', note: selectedNote },
+              }
+            )
+          }
+        />
+        <EditorPane
+          loading={loading}
+          selectedNote={selectedNote}
+          onCreateNote={handleCreateNote}
+          onTitleChange={handleTitleChange}
+          editorRef={editorRef}
+          onEditorChange={(html) => updateNoteContent({ content: html })}
+          onSlashKey={handleSlashKey}
+          onContextMenu={handleContextMenu}
+          onSlashMenuKeyDown={handleSlashMenuKeyDown}
+          isSlashMenuOpen={menu?.type === 'slash'}
+          setEditorInstance={setEditor}
+          onToggleFavorite={handleToggleFavorite}
+          onDeleteNote={handleDeleteNote}
+        />
+      </main>
     </div>
-  )
+
+    {/* Sidebar context menu — unchanged */}
+    {sidebarContext && (
+      <div
+        className="fixed z-40 w-40 rounded-md border border-[#2a2a2a] bg-[#1a1a1a] text-xs text-slate-100 shadow-xl py-2.5 px-0.5"
+        style={{ top: sidebarContext.y, left: sidebarContext.x }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('favorite')}>
+          <span>Add to Favourites</span>
+          <Star size={12} />
+        </button>
+        <button type="button" className="w-full px-3 py-1.5 text-left hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('rename')}>Rename</button>
+        <button type="button" className="w-full px-3 py-1.5 text-left text-rose-400 hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('delete')}>Delete</button>
+      </div>
+    )}
+
+    {/* Context + Slash menu — unchanged */}
+    {menu && (
+      <div
+        className="fixed z-50 w-52 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] p-1 shadow-xl"
+        style={{
+          top: showAbove ? menu.y - menuHeight : menu.y + 8,
+          left: Math.min(menu.x, window.innerWidth - 220),
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {menu.type === 'context' ? (
+          <>
+            <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Format</p>
+            <button onClick={() => applyCommand('h1')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm">Heading 1</button>
+            <button onClick={() => applyCommand('h2')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm">Heading 2</button>
+            <button onClick={() => applyCommand('bold')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm font-bold">Bold</button>
+            <button onClick={() => applyCommand('italic')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm italic">Italic</button>
+            <button onClick={() => applyCommand('highlight')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm text-yellow-400">Highlight</button>
+            <div className="my-1 border-t border-[#2a2a2a]" />
+            <button onClick={() => applyCommand('clear')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm text-rose-400">Clear Formatting</button>
+          </>
+        ) : (
+          <>
+            <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Insert</p>
+            <div className="max-h-[160px] overflow-y-auto scroll-thin">
+              {SLASH_COMMANDS.map((item, i) => (
+                <button
+                  key={item.command}
+                  onClick={() => applySlashCommand(item.command)}
+                  className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors ${
+                    i === slashMenuIndex ? 'bg-indigo-600 text-white' : 'hover:bg-[#2a2a2a] text-slate-100'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    )}
+  </div>
+)
 }
 
 export default App
