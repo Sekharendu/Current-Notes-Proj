@@ -48,11 +48,11 @@ export function TopBar({ notes, search, onChangeSearch, onSelectNote, selectedNo
                       || user?.user_metadata?.name        // GitHub full name
                       || user?.email                      // final fallback
   return (
-    <header className="flex items-center gap-3 border-b border-[#1f1f1f] bg-[#111111] px-5 py-3 flex-shrink-0">
+    <header className="flex items-center gap-3 bg-[#1a1a1a] px-5 py-3 flex-shrink-0">
 
       {/* Search */}
       <div className="relative flex-1" ref={searchRef}>
-        <div className="flex items-center gap-2 rounded-md bg-[#1a1a1a] border border-[#2a2a2a] px-3 py-1.5">
+        <div className="flex items-center gap-2 rounded-md  bg-[#161616] border border-[#333333] px-3 py-1.5">
           <Search size={14} style={{ color: '#444444' }} />
           <input
             value={search}
