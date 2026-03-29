@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Synced with KiroBitLogo variant="minimal" -->
+  <rect x="30" y="30" width="140" height="140" rx="12" fill="#ffffff"/>
+  <rect x="45" y="55" width="110" height="110" rx="6" fill="#10b981"/>
+  <rect x="30" y="30" width="140" height="20" rx="12" fill="#d1fae5"/>
+  <path d="M 70 75 L 70 145" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+  <path d="M 70 105 L 110 75" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M 70 110 L 110 145" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="130" cy="85" r="4" fill="#d1fae5"/>
+  <circle cx="130" cy="105" r="4" fill="#d1fae5"/>
+  <circle cx="130" cy="125" r="4" fill="#ffffff"/>
+</svg>

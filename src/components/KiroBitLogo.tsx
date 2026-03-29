@@ -44,29 +44,20 @@ export function KiroBitLogo({ variant = "primary", size = "lg" }: { variant?: "p
   }
 
   if (variant === "minimal") {
-    // Minimal version: Clean geometric design with "K"
+    // Same artwork as /public/kirobit-logo-minimal.svg (tab favicon) — single source in public/
+    const base = (import.meta as { env: { BASE_URL: string } }).env.BASE_URL
+    const src = `${base}kirobit-logo-minimal.svg`
     return (
-      <svg width={icon} height={icon} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Outer square representing notepad */}
-        <rect x="30" y="30" width="140" height="140" rx="12" fill="#ffffff" />
-        
-        {/* Inner white space */}
-        <rect x="45" y="55" width="110" height="110" rx="6" fill="#10b981" />
-        
-        {/* Top bar (binding) */}
-        <rect x="30" y="30" width="140" height="20" rx="12" fill="#d1fae5" />
-        
-        {/* Large stylized "K" */}
-        <path d="M 70 75 L 70 145" stroke="#ffffff" strokeWidth="8" strokeLinecap="round" />
-        <path d="M 70 105 L 110 75" stroke="#ffffff" strokeWidth="7" strokeLinecap="round" />
-        <path d="M 70 110 L 110 145" stroke="#ffffff" strokeWidth="7" strokeLinecap="round" />
-        
-        {/* Binary dots accent */}
-        <circle cx="130" cy="85" r="4" fill="#d1fae5" />
-        <circle cx="130" cy="105" r="4" fill="#d1fae5" />
-        <circle cx="130" cy="125" r="4" fill="#ffffff" />
-      </svg>
-    );
+      <img
+        src={src}
+        width={icon}
+        height={icon}
+        alt=""
+        aria-hidden
+        className="block shrink-0 select-none"
+        draggable={false}
+      />
+    )
   }
 
   // Primary version: Full logo with notepad, stylized "K", and tech details
