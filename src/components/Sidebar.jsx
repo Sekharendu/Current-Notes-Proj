@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types'
 import { List, Star, Plus, FileText, FolderPlus, ChevronRight, ChevronDown, Folder } from 'lucide-react'
+import { KiroBitLogo } from './KiroBitLogo'
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ')
@@ -39,12 +40,11 @@ export function Sidebar({
     <aside className="flex flex-col h-full overflow-hidden"
       style={{ background: '#222222', borderRight: '1px solid #333333' }}>
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3"
-        style={{ borderBottom: '1px solid #333333' }}>
+      {/* Header — height matches TopBar (`h-14`); bottom rule is drawn in App full-width */}
+      <div className="flex h-14 shrink-0 items-center justify-between px-4">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-xs font-semibold text-white">
-            N
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg" aria-hidden>
+            <KiroBitLogo variant="minimal" size="xs" />
           </span>
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-semibold tracking-tight truncate min-w-0" style={{ color: '#ffffff' }}>
@@ -64,11 +64,11 @@ export function Sidebar({
             'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
             activeTab === SidebarTabs.ALL
               ? 'bg-[#2a2a2a] text-white'
-              : 'text-[#6b7280] hover:bg-[#262626] hover:text-[#d1d5db]',
+              : 'text-[#6b7280] hover:bg-[#353535] hover:text-[#f3f4f6]',
           )}
           onClick={(e) => { e.stopPropagation(); onChangeTab(SidebarTabs.ALL); onSelectFolder(null) }}
         >
-          <List size={16} />
+          <List size={17} strokeWidth={1.75} />
         </button>
 
         <button
@@ -77,30 +77,30 @@ export function Sidebar({
             'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
             activeTab === SidebarTabs.FAVORITES
               ? 'bg-[#2a2a2a] text-yellow-400'
-              : 'text-[#6b7280] hover:bg-[#262626] hover:text-[#d1d5db]',
+              : 'text-[#6b7280] hover:bg-[#353535] hover:text-[#f3f4f6]',
           )}
           onClick={(e) => { e.stopPropagation(); onChangeTab(SidebarTabs.FAVORITES); onSelectFolder(null) }}
+          title="Favorites"
         >
-          <Star size={16} fill={activeTab === SidebarTabs.FAVORITES ? '#eab308' : 'none'} />
+          <Star size={17} strokeWidth={1.75} fill={activeTab === SidebarTabs.FAVORITES ? '#eab308' : 'none'} />
         </button>
 
         <button
           type="button"
-          className="ml-auto flex h-8 w-8 items-center justify-center rounded-md transition-colors bg-[#2a2a2a] text-[#9ca3af] hover:bg-[#333333] hover:text-[#d1d5db]"
+          className="ml-auto flex h-8 w-8 items-center justify-center rounded-md transition-colors text-[#9ca3af] hover:bg-[#333333] hover:text-[#d1d5db]"
           onClick={(e) => { e.stopPropagation(); onCreateNote() }}
           title="New note"
         >
-          <Plus size={16} />
+          <Plus size={17} strokeWidth={1.75} />
         </button>
 
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md transition-colors text-[#6b7280] hover:text-[#d1d5db]"
-          style={{ border: '1px dashed #333333' }}
+          className="flex h-8 w-8 items-center justify-center rounded-md transition-colors text-[#6b7280] hover:bg-[#353535] hover:text-[#f3f4f6]"
           onClick={(e) => { e.stopPropagation(); onCreateFolder() }}
           title="New folder"
         >
-          <FolderPlus size={16} />
+          <FolderPlus size={17} strokeWidth={1.75} />
         </button>
       </div>
 
@@ -116,12 +116,10 @@ export function Sidebar({
           <div key={folder.id} className="mb-0.5">
             {editingItem && editingItem.kind === 'folder' && editingItem.id === folder.id ? (
               // ✅ CHANGED: py-1.5 → py-2, text-xs → text-sm
-              <div className="flex items-center rounded-md px-2 py-2 text-sm"
+              <div className="flex items-center rounded-md px-2.5 py-2.5 text-[15px] leading-snug"
                 style={{ color: '#9ca3af' }}>
-                {/* ✅ CHANGED: size 10 → 14 */}
-                <ChevronDown size={14} className="mr-1 flex-shrink-0" style={{ color: '#6b7280' }} />
-                {/* ✅ CHANGED: size 10 → 15 */}
-                <Folder size={15} className="mr-2 flex-shrink-0" style={{ color: '#eab308' }} />
+                <ChevronDown size={16} strokeWidth={1.75} className="mr-1 flex-shrink-0" style={{ color: '#6b7280' }} />
+                <Folder size={17} strokeWidth={1.75} className="mr-2 flex-shrink-0" style={{ color: '#9ca3af' }} />
                 <input
                   autoFocus
                   value={editingItem.tempName}
@@ -132,7 +130,7 @@ export function Sidebar({
                     if (e.key === 'Escape') { e.preventDefault(); onCancelEditing() }
                   }}
                   // ✅ CHANGED: text-xs → text-sm
-                  className="w-full rounded-sm px-1 py-0.5 text-sm outline-none"
+                  className="w-full rounded-sm px-1 py-0.5 text-[15px] outline-none"
                   style={{ background: '#1a1a1a', color: '#ffffff', border: '1px solid #444444' }}
                 />
               </div>
@@ -142,21 +140,18 @@ export function Sidebar({
                 onClick={(e) => { e.stopPropagation(); onToggleFolderOpen(folder.id); onSelectFolder(folder.id) }}
                 onContextMenu={(e) => onSidebarContext(e, { type: 'folder', folder })}
                 className={classNames(
-                  // ✅ CHANGED: py-1.5 → py-2, text-xs → text-sm
-                  'flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm font-medium transition-colors',
+                  'flex w-full items-center justify-between rounded-md px-2.5 py-2.5 text-left text-[15px] font-medium leading-snug transition-colors',
                   selectedFolderId === folder.id && !selectedNoteId
-                    ? 'bg-[#2a2a2a] text-white'
-                    : 'text-[#9ca3af] hover:bg-[#262626] hover:text-[#d1d5db]',
+                    ? 'bg-[#505050] text-[#f3f4f6] hover:bg-[#464646]'
+                    : 'text-[#9ca3af] hover:bg-[#3a3a3a] hover:text-[#f3f4f6]',
                 )}
               >
-                <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                <span className="flex items-center gap-2 min-w-0 flex-1">
                   {openFolders.includes(folder.id)
-                    // ✅ CHANGED: size 12 → 15
-                    ? <ChevronDown size={15} className="flex-shrink-0" style={{ color: '#6b7280' }} />
-                    : <ChevronRight size={15} className="flex-shrink-0" style={{ color: '#6b7280' }} />
+                    ? <ChevronDown size={16} strokeWidth={1.75} className="flex-shrink-0" style={{ color: '#6b7280' }} />
+                    : <ChevronRight size={16} strokeWidth={1.75} className="flex-shrink-0" style={{ color: '#6b7280' }} />
                   }
-                  {/* ✅ CHANGED: size 13 → 16 */}
-                  <Folder size={16} className="flex-shrink-0" style={{ color: '#eab308' }} />
+                  <Folder size={17} strokeWidth={1.75} className="flex-shrink-0" style={{ color: '#9ca3af' }} />
                   <span className="truncate min-w-0">{folder.name || 'New Folder'}</span>
                 </span>
               </button>
@@ -167,7 +162,7 @@ export function Sidebar({
               notes.filter((n) => n.folder_id === folder.id).map((note) => (
                 editingItem && editingItem.kind === 'note' && editingItem.id === note.id ? (
                   // ✅ CHANGED: text-[11px] → text-xs
-                  <div key={note.id} className="ml-6 mt-0.5 flex w-[calc(100%-1.5rem)] items-center rounded-md px-2 py-1.5 text-xs"
+                  <div key={note.id} className="ml-6 mt-0.5 flex w-[calc(100%-1.5rem)] items-center rounded-md px-2.5 py-2 text-[13px] leading-snug"
                     style={{ color: '#9ca3af' }}>
                     <input
                       autoFocus
@@ -179,7 +174,7 @@ export function Sidebar({
                         if (e.key === 'Escape') { e.preventDefault(); onCancelEditing() }
                       }}
                       // ✅ CHANGED: text-[11px] → text-xs
-                      className="w-full rounded-sm px-1 py-0.5 text-xs outline-none"
+                      className="w-full rounded-sm px-1 py-0.5 text-[13px] outline-none"
                       style={{ background: '#1a1a1a', color: '#ffffff', border: '1px solid #444444' }}
                     />
                   </div>
@@ -190,19 +185,20 @@ export function Sidebar({
                     onClick={(e) => { e.stopPropagation(); onSelectNote(note.id) }}
                     onContextMenu={(e) => onSidebarContext(e, { type: 'note', note })}
                     className={classNames(
-                      // ✅ CHANGED: ml-7 → ml-6, py-1 → py-1.5, text-[11px] → text-xs
-                      // ✅ CHANGED: w-[calc(100%-1.75rem)] → w-[calc(100%-1.5rem)]
-                      'ml-6 mt-0.5 flex w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs transition-colors',
+                      'ml-6 mt-0.5 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-md px-2.5 py-2 text-left text-[13px] leading-snug transition-colors',
                       selectedNoteId === note.id
-                        ? 'bg-[#2a2a2a] text-white'
-                        : 'text-[#9ca3af] hover:bg-[#262626] hover:text-[#d1d5db]',
+                        ? 'bg-[#505050] text-[#f3f4f6] hover:bg-[#464646]'
+                        : 'text-[#9ca3af] hover:bg-[#3a3a3a] hover:text-[#f3f4f6]',
                     )}
                   >
-                    {/* ✅ CHANGED: size 11 → 14 */}
-                    <FileText size={14} className="flex-shrink-0" style={{ color: '#6b7280' }} />
+                    <FileText
+                      size={15}
+                      strokeWidth={1.75}
+                      className="flex-shrink-0"
+                      style={{ color: selectedNoteId === note.id ? '#9ca3af' : '#6b7280' }}
+                    />
                     <span className="flex-1 truncate">{note.title || 'Untitled'}</span>
-                    {/* ✅ CHANGED: size 10 → 12 */}
-                    {note.is_favorite && <Star size={12} fill='#eab308' color='#eab308' className="flex-shrink-0" />}
+                    {note.is_favorite && <Star size={13} fill='#eab308' color='#eab308' className="flex-shrink-0" />}
                   </button>
                 )
               ))
@@ -212,15 +208,15 @@ export function Sidebar({
 
         {/* Standalone / Favorites notes */}
         <div
-          className={activeTab === SidebarTabs.ALL ? 'mt-2 pt-2' : ''}
-          style={activeTab === SidebarTabs.ALL ? { borderTop: '1px solid #333333' } : {}}
+          className={activeTab === SidebarTabs.ALL ? 'mt-2' : ''}
+          // style={activeTab === SidebarTabs.ALL ? { borderTop: '1px solid #333333' } : {}}
         >
           {displayNotes
             .filter((n) => activeTab === SidebarTabs.FAVORITES ? true : !n.folder_id)
             .map((note) => (
               editingItem && editingItem.kind === 'note' && editingItem.id === note.id ? (
                 // ✅ CHANGED: text-xs → text-sm, py-1.5 → py-2
-                <div key={note.id} className="flex items-center rounded-md px-2 py-2 text-sm"
+                <div key={note.id} className="flex items-center rounded-md px-2.5 py-2.5 text-[15px] leading-snug"
                   style={{ color: '#9ca3af' }}>
                   <input
                     autoFocus
@@ -231,8 +227,7 @@ export function Sidebar({
                       if (e.key === 'Enter') { e.preventDefault(); onCommitEditing() }
                       if (e.key === 'Escape') { e.preventDefault(); onCancelEditing() }
                     }}
-                    // ✅ CHANGED: text-xs → text-sm
-                    className="w-full rounded-sm px-1 py-0.5 text-sm outline-none"
+                    className="w-full rounded-sm px-1 py-0.5 text-[15px] outline-none"
                     style={{ background: '#1a1a1a', color: '#ffffff', border: '1px solid #444444' }}
                   />
                 </div>
@@ -243,18 +238,20 @@ export function Sidebar({
                   onClick={(e) => { e.stopPropagation(); onSelectNote(note.id) }}
                   onContextMenu={(e) => onSidebarContext(e, { type: 'note', note })}
                   className={classNames(
-                    // ✅ CHANGED: py-1.5 → py-2, text-xs → text-sm
-                    'flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-left text-sm transition-colors',
+                    'flex w-full items-center gap-2 rounded-md px-2.5 py-2.5 text-left text-[15px] leading-snug transition-colors',
                     selectedNoteId === note.id
-                      ? 'bg-[#2a2a2a] text-white'
-                      : 'text-[#9ca3af] hover:bg-[#262626] hover:text-[#d1d5db]',
+                      ? 'bg-[#505050] text-[#f3f4f6] hover:bg-[#464646]'
+                      : 'text-[#9ca3af] hover:bg-[#3a3a3a] hover:text-[#f3f4f6]',
                   )}
                 >
-                  {/* ✅ CHANGED: size 12 → 15 */}
-                  <FileText size={15} className="flex-shrink-0" style={{ color: '#6b7280' }} />
+                  <FileText
+                    size={16}
+                    strokeWidth={1.75}
+                    className="flex-shrink-0"
+                    style={{ color: selectedNoteId === note.id ? '#9ca3af' : '#6b7280' }}
+                  />
                   <span className="flex-1 truncate min-w-0">{note.title || 'Untitled'}</span>
-                  {/* ✅ CHANGED: size 10 → 12 */}
-                  {note.is_favorite && <Star size={12} fill='#eab308' color='#eab308' className="flex-shrink-0" />}
+                  {note.is_favorite && <Star size={13} fill='#eab308' color='#eab308' className="flex-shrink-0" />}
                 </button>
               )
             ))
