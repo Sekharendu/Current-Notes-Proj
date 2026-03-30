@@ -1,11 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, PanelLeftClose, PanelLeft } from 'lucide-react'
 import PropTypes from 'prop-types'
 
-export function TopBar({ notes, search, onChangeSearch, onSelectNote, selectedNote, onDeleteNote, user, onLogout }) {
+export function TopBar({
+  notes,
+  search,
+  onChangeSearch,
+  onSelectNote,
+  user,
+  onLogout,
+  sidebarOpen,
+  onToggleSidebar,
+}) {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const searchRef = useRef(null)
+  const searchInputRef = useRef(null)
   const userMenuRef = useRef(null)
 
   const filteredNotes = search.trim()
@@ -17,6 +27,8 @@ export function TopBar({ notes, search, onChangeSearch, onSelectNote, selectedNo
         )
       })
     : []
+
+  const showSearchPanel = isSearchOpen && Boolean(search.trim())
 
   useEffect(() => {
     const handler = (e) => {
@@ -38,28 +50,59 @@ export function TopBar({ notes, search, onChangeSearch, onSelectNote, selectedNo
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      if (e.key.toLowerCase() !== 'k') return
+      e.preventDefault()
+      searchInputRef.current?.focus()
+      setIsSearchOpen(true)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   // ✅ GitHub uses avatar_url, Google uses picture — both are covered
   // But also add a fallback for the display name:
   const avatarUrl = user?.user_metadata?.avatar_url  // ✅ works for both GitHub and Google
                     || user?.user_metadata?.picture   // ✅ Google fallback
 
-  const displayName = user?.user_metadata?.full_name      // Google
-                      || user?.user_metadata?.user_name   // GitHub username
-                      || user?.user_metadata?.name        // GitHub full name
-                      || user?.email                      // final fallback
   return (
-    <header className="flex items-center gap-3 bg-[#1a1a1a] px-5 py-3 flex-shrink-0">
+    <header className="flex h-14 shrink-0 items-center gap-3 bg-[#1a1a1a] px-4 pl-3 flex-shrink-0">
+      {/* Sidebar toggle — bottom border is a single full-width line from App */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleSidebar()
+        }}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[#262626]"
+        style={{ color: '#9ca3af' }}
+        aria-expanded={sidebarOpen}
+        aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+        title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+      >
+        {sidebarOpen ? <PanelLeftClose size={20} strokeWidth={1.75} /> : <PanelLeft size={20} strokeWidth={1.75} />}
+      </button>
 
-      {/* Search */}
-      <div className="relative flex-1" ref={searchRef}>
-        <div className="flex items-center gap-2 rounded-md  bg-[#161616] border border-[#333333] px-3 py-1.5">
+      {/* Search — ~65% width (35% narrower than full middle), centered */}
+      <div className="relative flex min-w-0 flex-1 justify-center">
+        <div className="relative w-[65%] min-w-0 max-w-full" ref={searchRef}>
+          <div
+            className={
+              showSearchPanel
+                ? 'flex items-center gap-2 rounded-t-md rounded-b-none bg-[#161616] border border-[#333333] border-b-0 px-3 py-1.5'
+                : 'flex items-center gap-2 rounded-md bg-[#161616] border border-[#333333] px-3 py-1.5'
+            }
+          >
           <Search size={14} style={{ color: '#444444' }} />
           <input
+            ref={searchInputRef}
             value={search}
             onChange={(e) => { onChangeSearch(e.target.value); setIsSearchOpen(true) }}
             onFocus={() => search.trim() && setIsSearchOpen(true)}
-            placeholder="Search by title or content"
-            className="w-full bg-transparent text-sm focus:outline-none"
+            placeholder="Search notes (Ctrl+K)"
+            className="w-full min-w-0 bg-transparent text-sm focus:outline-none"
             style={{ color: '#c9c9c9' }}
           />
           {search && (
@@ -71,17 +114,17 @@ export function TopBar({ notes, search, onChangeSearch, onSelectNote, selectedNo
               <X size={12} />
             </button>
           )}
-        </div>
+          </div>
 
-        {/* Search dropdown */}
-        {isSearchOpen && search.trim() && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] shadow-2xl overflow-hidden">
+          {/* Search dropdown — flush under search field; thin scrollbar matches editor */}
+          {showSearchPanel && (
+          <div className="absolute left-0 right-0 top-full z-50 rounded-b-lg rounded-t-none border border-[#333333] border-t-0 bg-[#1a1a1a] shadow-2xl overflow-hidden">
             {filteredNotes.length === 0 ? (
               <p className="px-4 py-3 text-sm text-center" style={{ color: '#555555' }}>
                 No results found
               </p>
             ) : (
-              <ul className="max-h-[224px] overflow-y-auto divide-y divide-[#2a2a2a]">
+              <ul className="scroll-thin max-h-[224px] overflow-y-auto divide-y divide-[#2a2a2a]">
                 {filteredNotes.map((note) => (
                   <li
                     key={note.id}
@@ -106,7 +149,8 @@ export function TopBar({ notes, search, onChangeSearch, onSelectNote, selectedNo
               </ul>
             )}
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Avatar */}
@@ -171,8 +215,8 @@ TopBar.propTypes = {
   search: PropTypes.string.isRequired,
   onChangeSearch: PropTypes.func.isRequired,
   onSelectNote: PropTypes.func.isRequired,
-  selectedNote: PropTypes.object,
-  onDeleteNote: PropTypes.func.isRequired,
   user: PropTypes.object,
   onLogout: PropTypes.func.isRequired,
+  sidebarOpen: PropTypes.bool.isRequired,
+  onToggleSidebar: PropTypes.func.isRequired,
 }
