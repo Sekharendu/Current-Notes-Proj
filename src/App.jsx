@@ -1,27 +1,158 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 import { Sidebar, SidebarTabs } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
 import { EditorPane } from './components/EditorPane'
 import './index.css'
 import { Auth } from './components/Auth'
-import { Star } from 'lucide-react'
+import {
+  Star,
+  Heading1,
+  Heading2,
+  Heading3,
+  Pilcrow,
+  Bold,
+  Italic,
+  Strikethrough,
+  Highlighter,
+  List,
+  ListOrdered,
+  Code2,
+  Eraser,
+  Copy,
+  ClipboardPaste,
+  TextSelect,
+} from 'lucide-react'
 
-const SLASH_COMMANDS = [
-  { label: 'Heading 1', command: 'h1' },
-  { label: 'Heading 2', command: 'h2' },
-  { label: 'Heading 3', command: 'h3' },
-  { label: 'Bold', command: 'bold' },
-  { label: 'Italic', command: 'italic' },
-  { label: 'Strikethrough', command: 'strike' },
-  { label: 'Highlight', command: 'highlight' },
-  { label: 'Bullet List', command: 'bullet' },
-  { label: 'Numbered List', command: 'numbered' },
-  { label: 'Code Block', command: 'code' },
+const FORMAT_MENU_ICON = {
+  h1: Heading1,
+  h2: Heading2,
+  h3: Heading3,
+  body: Pilcrow,
+  bold: Bold,
+  italic: Italic,
+  strike: Strikethrough,
+  highlight: Highlighter,
+  bullet: List,
+  numbered: ListOrdered,
+  code: Code2,
+  clear: Eraser,
+  copy: Copy,
+  paste: ClipboardPaste,
+  selectAll: TextSelect,
+}
+
+/** Unified format menu: slash (/) and right-click on selection */
+const FORMAT_MENU_GROUPS = [
+  {
+    id: 'headings',
+    title: 'Headings',
+    items: [
+      { label: 'Heading 1', command: 'h1' },
+      { label: 'Heading 2', command: 'h2' },
+      { label: 'Heading 3', command: 'h3' },
+      { label: 'Paragraph', command: 'body' },
+    ],
+  },
+  {
+    id: 'style',
+    title: 'Text',
+    items: [
+      { label: 'Bold', command: 'bold' },
+      { label: 'Italic', command: 'italic' },
+      { label: 'Strikethrough', command: 'strike' },
+      { label: 'Highlight', command: 'highlight' },
+    ],
+  },
+  {
+    id: 'lists',
+    title: 'Lists',
+    items: [
+      { label: 'Bullet list', command: 'bullet' },
+      { label: 'Numbered list', command: 'numbered' },
+    ],
+  },
+  {
+    id: 'block',
+    title: 'Blocks',
+    items: [{ label: 'Code block', command: 'code' }],
+  },
+  {
+    id: 'clipboard',
+    title: 'Edit',
+    items: [
+      { label: 'Copy', command: 'copy' },
+      { label: 'Paste', command: 'paste' },
+      { label: 'Select all', command: 'selectAll' },
+    ],
+  },
+  {
+    id: 'clear',
+    title: null,
+    items: [{ label: 'Clear formatting', command: 'clear', danger: true }],
+  },
 ]
+
+const FORMAT_MENU_FLAT = FORMAT_MENU_GROUPS.flatMap((g) => g.items)
+
+/** Gap from anchor; panel = header strip + list (max 5 option rows) + padding */
+const FORMAT_MENU_GAP = 8
+const FORMAT_MENU_HEADER_STRIP_PX = 56
+/** ~5 option rows visible; rest scrolls (section labels scroll with list) */
+const FORMAT_MENU_LIST_MAX_PX = 220
+const FORMAT_MENU_PANEL_ESTIMATE = FORMAT_MENU_HEADER_STRIP_PX + FORMAT_MENU_LIST_MAX_PX + 20
+
+function getFormatMenuPlacement(anchor) {
+  const h = FORMAT_MENU_PANEL_ESTIMATE
+  const gap = FORMAT_MENU_GAP
+  const ih = window.innerHeight
+  const iw = window.innerWidth
+  const spaceBelow = ih - anchor.y - gap
+  const spaceAbove = anchor.y - gap
+
+  let top
+  let opensAbove = false
+  if (spaceBelow >= h) {
+    top = anchor.y + gap
+  } else if (spaceAbove >= h) {
+    top = anchor.y - h - gap
+    opensAbove = true
+  } else if (spaceBelow >= spaceAbove) {
+    top = Math.min(anchor.y + gap, ih - h - gap)
+  } else {
+    top = Math.max(gap, anchor.y - h - gap)
+    opensAbove = true
+  }
+
+  const panelW = Math.min(288, iw - 16)
+  let left = Math.min(anchor.x, iw - panelW - gap)
+  left = Math.max(gap, left)
+
+  top = Math.max(gap, Math.min(top, ih - h - gap))
+
+  return { top, left, opensAbove }
+}
+
+function getSidebarContextMenuItems(item) {
+  if (!item) return []
+  if (item.type === 'note') {
+    return [
+      { action: 'favorite', label: 'Add to Favourites', showStar: true },
+      { action: 'rename', label: 'Rename', showStar: false },
+      { action: 'delete', label: 'Delete', danger: true },
+    ]
+  }
+  return [
+    { action: 'rename', label: 'Rename', showStar: false },
+    { action: 'delete', label: 'Delete', danger: true },
+  ]
+}
 
 function App() {
   const slashInsertPosRef = useRef(null)
+  const sidebarContextRef = useRef(null)
+  const sidebarContextMenuIndexRef = useRef(0)
+  const applySidebarActionRef = useRef(async () => {})
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState(SidebarTabs.ALL)
   const [folders, setFolders] = useState([])
@@ -30,6 +161,7 @@ function App() {
   const [selectedNoteId, setSelectedNoteId] = useState(null)
   const [search, setSearch] = useState('')
   const [sidebarContext, setSidebarContext] = useState(null)
+  const [sidebarContextMenuIndex, setSidebarContextMenuIndex] = useState(0)
   const [editingItem, setEditingItem] = useState(null)
   const [openFolders, setOpenFolders] = useState([])
   const editorRef = useRef(null)
@@ -39,12 +171,14 @@ function App() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(288) // 288px = w-72
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const isDraggingRef = useRef(false)
   const MIN_SIDEBAR = 180
   const MAX_SIDEBAR = 480
+  /** Must match TopBar + Sidebar header row (`h-14`) for the full-width divider */
+  const HEADER_ROW_PX = 56
 
-  const CONTEXT_MENU_HEIGHT = 260  // accurate height for 6 buttons + label + divider
-  const SLASH_MENU_HEIGHT = 220    // 5 visible items + label + scroll
+  sidebarContextRef.current = sidebarContext
 
   // ── Auth ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -83,8 +217,13 @@ function App() {
 
   // ── Handlers ──────────────────────────────────────────────────────
   
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((open) => !open)
+  }, [])
+
   // Add drag handlers
   const handleDragStart = (e) => {
+    if (!sidebarOpen) return
     isDraggingRef.current = true
     e.preventDefault()
 
@@ -105,9 +244,9 @@ function App() {
   }
 
   // Touch support for mobile drag
-  const handleTouchStart = (e) => {
-    const touch = e.touches[0]
-    
+  const handleTouchStart = () => {
+    if (!sidebarOpen) return
+
     const onTouchMove = (e) => {
       const touch = e.touches[0]
       const newWidth = Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, touch.clientX))
@@ -131,6 +270,11 @@ function App() {
     setSelectedNoteId(null)
   }
 
+  /** Clipboard / focus: run after menu unmounts so the editor can take focus again */
+  const runAfterMenuClose = useCallback((fn) => {
+    setTimeout(fn, 10)
+  }, [])
+
   const applyCommand = (command) => {
     const chain = editor.chain().focus()
     const actions = {
@@ -147,6 +291,58 @@ function App() {
       'numbered': () => chain.toggleOrderedList().run(),
       'code': () => chain.toggleCodeBlock().run(),
       'clear': () => chain.clearNodes().unsetAllMarks().run(),
+      'copy': () => {
+        runAfterMenuClose(() => {
+          if (!editor) return
+          editor.chain().focus().run()
+          const { from, to } = editor.state.selection
+          const text =
+            from === to
+              ? editor.getText({ blockSeparator: '\n' })
+              : editor.state.doc.textBetween(from, to, '\n')
+          void navigator.clipboard.writeText(text).catch(() => {
+            try {
+              editor.view.dom.focus()
+              document.execCommand('copy')
+            } catch {
+              /* ignore */
+            }
+          })
+        })
+      },
+      'paste': () => {
+        runAfterMenuClose(() => {
+          if (!editor) return
+          editor.chain().focus().run()
+          void (async () => {
+            try {
+              const items = await navigator.clipboard.read()
+              for (const item of items) {
+                if (item.types.includes('text/html')) {
+                  const html = await (await item.getType('text/html')).text()
+                  editor.chain().focus().insertContent(html).run()
+                  return
+                }
+              }
+              const plain = await navigator.clipboard.readText()
+              editor.chain().focus().insertContent(plain).run()
+            } catch {
+              try {
+                const plain = await navigator.clipboard.readText()
+                editor.chain().focus().insertContent(plain).run()
+              } catch {
+                /* ignore */
+              }
+            }
+          })()
+        })
+      },
+      'selectAll': () => {
+        runAfterMenuClose(() => {
+          if (!editor) return
+          editor.chain().focus().selectAll().run()
+        })
+      },
     }
     if (actions[command]) actions[command]()
     setMenu(null)
@@ -164,7 +360,8 @@ function App() {
 
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed || selection.toString().trim() === '') return
-    setMenu({ x: e.clientX, y: e.clientY, type: 'context' })
+    setSlashMenuIndex(0)
+    setMenu({ x: e.clientX, y: e.clientY, source: 'context' })
     setTimeout(() => {
       const closeOnNextClick = () => {
         setMenu(null)
@@ -182,7 +379,7 @@ function App() {
       slashInsertPosRef.current = editor.state.selection.from - 1
     }
     setSlashMenuIndex(0)
-    setMenu({ x: cursorCoords.x, y: cursorCoords.y, type: 'slash' })
+    setMenu({ x: cursorCoords.x, y: cursorCoords.y, source: 'slash' })
     setTimeout(() => {
       const closeOnNextClick = () => {
         setMenu(null)
@@ -192,40 +389,42 @@ function App() {
     }, 0)
   }, [editor])
 
-  const applySlashCommand = (command) => {
+  const applyFormatMenuCommand = (command) => {
     if (!editor) return
-    const pos = slashInsertPosRef.current
-    if (pos !== null) {
+    if (menu?.source === 'slash' && slashInsertPosRef.current !== null) {
+      const pos = slashInsertPosRef.current
       editor.chain().focus().deleteRange({ from: pos, to: pos + 1 }).run()
+      slashInsertPosRef.current = null
     }
     applyCommand(command)
-    slashInsertPosRef.current = null
   }
 
-  const handleSlashMenuKeyDown = useCallback((e) => {
-    if (!menu || menu.type !== 'slash') return false
+  function handleFormatMenuKeyDown(e) {
+    if (!menu) return false
+    const len = FORMAT_MENU_FLAT.length
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setSlashMenuIndex((prev) => (prev + 1) % SLASH_COMMANDS.length)
+      setSlashMenuIndex((prev) => (prev + 1) % len)
       return true
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setSlashMenuIndex((prev) => (prev - 1 + SLASH_COMMANDS.length) % SLASH_COMMANDS.length)
+      setSlashMenuIndex((prev) => (prev - 1 + len) % len)
       return true
     }
     if (e.key === 'Enter') {
       e.preventDefault()
-      applySlashCommand(SLASH_COMMANDS[slashMenuIndex].command)
+      applyFormatMenuCommand(FORMAT_MENU_FLAT[slashMenuIndex].command)
       return true
     }
     if (e.key === 'Escape') {
       e.preventDefault()
+      slashInsertPosRef.current = null
       setMenu(null)
       return true
     }
     return false
-  }, [menu, slashMenuIndex])
+  }
 
   const visibleNotes = useMemo(() => {
     let list = notes
@@ -246,6 +445,13 @@ function App() {
     }
   }, [selectedNote, visibleNotes])
 
+  /** Editor format menu (/) + right-click: close when navigating away — sidebar clicks use stopPropagation so they never hit clearMenus. */
+  useEffect(() => {
+    setMenu(null)
+    setSlashMenuIndex(0)
+    slashInsertPosRef.current = null
+  }, [selectedNoteId, selectedFolderId, activeTab, sidebarOpen, search])
+
   const updateNoteContent = async (changes) => {
     if (!selectedNote) return
     const next = { ...selectedNote, ...changes, updated_at: new Date().toISOString() }
@@ -259,7 +465,7 @@ function App() {
   const handleCreateNote = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase.from('notes').insert([{
-      user_id: user?.id, title: 'Untitled', content: '', folder_id: selectedFolderId,
+      user_id: user?.id, title: 'New Page', content: '', folder_id: selectedFolderId,
     }]).select().single()
     if (error) { console.error('Error creating note', error); return }
     setNotes((prev) => [data, ...prev])
@@ -294,8 +500,13 @@ function App() {
 
   const closeSidebarContext = () => setSidebarContext(null)
 
+  const sidebarMenuEntries = useMemo(
+    () => (sidebarContext ? getSidebarContextMenuItems(sidebarContext.item) : []),
+    [sidebarContext]
+  )
+
   const applySidebarAction = async (action) => {
-    const target = sidebarContext?.item
+    const target = sidebarContextRef.current?.item
     if (!target) return
     if (action === 'favorite' && target.type === 'note') await handleToggleFavorite(target.note)
     if (action === 'rename') {
@@ -317,6 +528,49 @@ function App() {
     }
     closeSidebarContext()
   }
+
+  applySidebarActionRef.current = applySidebarAction
+
+  useEffect(() => {
+    if (sidebarContext) {
+      sidebarContextMenuIndexRef.current = 0
+      setSidebarContextMenuIndex(0)
+    }
+  }, [sidebarContext])
+
+  useEffect(() => {
+    if (!sidebarContext) return
+    const items = sidebarMenuEntries
+    const len = items.length
+    if (len === 0) return
+
+    const onKeyDown = (e) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        e.stopPropagation()
+        const n = (sidebarContextMenuIndexRef.current + 1) % len
+        sidebarContextMenuIndexRef.current = n
+        setSidebarContextMenuIndex(n)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        e.stopPropagation()
+        const n = (sidebarContextMenuIndexRef.current - 1 + len) % len
+        sidebarContextMenuIndexRef.current = n
+        setSidebarContextMenuIndex(n)
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        e.stopPropagation()
+        const action = items[sidebarContextMenuIndexRef.current]?.action
+        if (action) applySidebarActionRef.current(action)
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        closeSidebarContext()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [sidebarContext, sidebarMenuEntries])
 
   const handleChangeEditingName = (name) => setEditingItem((prev) => prev ? { ...prev, tempName: name } : prev)
 
@@ -356,9 +610,40 @@ function App() {
 
   const clearMenus = () => { closeSidebarContext(); setMenu(null) }
 
-  // ── Smart menu positioning ────────────────────────────────────────
-  const menuHeight = menu?.type === 'context' ? CONTEXT_MENU_HEIGHT : SLASH_MENU_HEIGHT
-  const showAbove = menu ? (window.innerHeight - menu.y) < menuHeight + 40 : false
+  const formatMenuPopoverRef = useRef(null)
+  const [formatMenuMeasuredPos, setFormatMenuMeasuredPos] = useState(null)
+
+  const formatMenuPlacement = useMemo(
+    () => (menu ? getFormatMenuPlacement({ x: menu.x, y: menu.y }) : null),
+    [menu]
+  )
+
+  /** When the menu opens above the anchor, placement used a tall height estimate — measure real height so the gap matches the “open below” case (FORMAT_MENU_GAP). */
+  useLayoutEffect(() => {
+    if (!menu) {
+      setFormatMenuMeasuredPos(null)
+      return
+    }
+    if (!formatMenuPlacement?.opensAbove) {
+      setFormatMenuMeasuredPos(null)
+      return
+    }
+    const el = formatMenuPopoverRef.current
+    if (!el) return
+    const measuredH = el.getBoundingClientRect().height
+    const gap = FORMAT_MENU_GAP
+    let top = menu.y - measuredH - gap
+    const ih = window.innerHeight
+    top = Math.max(gap, Math.min(top, ih - measuredH - gap))
+    setFormatMenuMeasuredPos({ top, left: formatMenuPlacement.left })
+  }, [menu, formatMenuPlacement])
+
+  const formatMenuStylePos =
+    menu && formatMenuPlacement
+      ? (formatMenuPlacement.opensAbove && formatMenuMeasuredPos
+          ? formatMenuMeasuredPos
+          : formatMenuPlacement)
+      : null
 
   // ── Early returns ─────────────────────────────────────────────────
   if (authLoading) {
@@ -374,14 +659,20 @@ function App() {
   // ── Render ────────────────────────────────────────────────────────
   return (
   // ✅ CHANGED: h-screen → height:100dvh (fixes mobile browser bar)
-  <div className="flex overflow-hidden text-slate-100"
+  <div className="flex overflow-hidden text-[#c9c9c9]"
     style={{ background: '#0f0f0f', height: '100dvh' }}>
-    <div className="flex w-full h-full" onClick={clearMenus}>
-
-      {/* ✅ CHANGED: sidebar now has dynamic width instead of fixed w-72 */}
+    <div className="relative flex w-full h-full" onClick={clearMenus}>
+      {/* One horizontal rule under the header row (sidebar title + top bar), full viewport width */}
       <div
-        className="flex-shrink-0 overflow-hidden"
-        style={{ width: `${sidebarWidth}px` }}
+        className="pointer-events-none absolute left-0 right-0 z-20 h-px bg-[#333333]"
+        style={{ top: HEADER_ROW_PX }}
+        aria-hidden
+      />
+
+      {/* Sidebar column: width animates when toggled */}
+      <div
+        className="flex-shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
+        style={{ width: sidebarOpen ? `${sidebarWidth}px` : 0 }}
       >
         <Sidebar
           activeTab={activeTab}
@@ -407,37 +698,31 @@ function App() {
         />
       </div>
 
-      {/* ✅ NEW: drag handle between sidebar and editor */}
-      <div
-        className="flex-shrink-0 w-1 cursor-col-resize flex items-center justify-center group"
-        style={{ background: '#1a1a1a' }}
-        onMouseDown={handleDragStart}
-        onTouchStart={handleTouchStart}
-      >
+      {/* Drag handle between sidebar and editor (hidden when sidebar collapsed) */}
+      {sidebarOpen && (
         <div
-          className="w-0.5 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-          style={{ background: '#444444' }}
-        />
-      </div>
+          className="flex-shrink-0 w-1 cursor-col-resize flex items-center justify-center group"
+          style={{ background: '#1a1a1a' }}
+          onMouseDown={handleDragStart}
+          onTouchStart={handleTouchStart}
+        >
+          <div
+            className="w-0.5 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ background: '#444444' }}
+          />
+        </div>
+      )}
 
-      <main className="flex flex-1 flex-col bg-[#1a1a1a] min-h-0 overflow-hidden">
+      <main className="flex flex-1 flex-col bg-[#1a1a1a] min-h-0 overflow-hidden min-w-0">
         <TopBar
           notes={notes}
           search={search}
           onChangeSearch={setSearch}
-          selectedNote={selectedNote}
           onSelectNote={setSelectedNoteId}
-          onDeleteNote={handleDeleteNote}
           user={user}
           onLogout={handleLogout}
-          onOpenMenu={(e) =>
-            setSidebarContext((prev) =>
-              prev && prev.special === 'top' ? null : {
-                special: 'top', x: e.clientX, y: e.clientY + 10,
-                item: { type: 'note', note: selectedNote },
-              }
-            )
-          }
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={toggleSidebar}
         />
         <EditorPane
           loading={loading}
@@ -448,8 +733,8 @@ function App() {
           onEditorChange={(html) => updateNoteContent({ content: html })}
           onSlashKey={handleSlashKey}
           onContextMenu={handleContextMenu}
-          onSlashMenuKeyDown={handleSlashMenuKeyDown}
-          isSlashMenuOpen={menu?.type === 'slash'}
+          onFormatMenuKeyDown={handleFormatMenuKeyDown}
+          isFormatMenuOpen={Boolean(menu)}
           setEditorInstance={setEditor}
           onToggleFavorite={handleToggleFavorite}
           onDeleteNote={handleDeleteNote}
@@ -459,59 +744,134 @@ function App() {
 
     {/* Sidebar context menu — unchanged */}
     {sidebarContext && (
-      <div
-        className="fixed z-40 w-40 rounded-md border border-[#2a2a2a] bg-[#1a1a1a] text-xs text-slate-100 shadow-xl py-2.5 px-0.5"
-        style={{ top: sidebarContext.y, left: sidebarContext.x }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button type="button" className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('favorite')}>
-          <span>Add to Favourites</span>
-          <Star size={12} />
-        </button>
-        <button type="button" className="w-full px-3 py-1.5 text-left hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('rename')}>Rename</button>
-        <button type="button" className="w-full px-3 py-1.5 text-left text-rose-400 hover:bg-[#2a2a2a]" onClick={() => applySidebarAction('delete')}>Delete</button>
-      </div>
+        <div
+          className="fixed z-40 min-w-[11rem] rounded-md border border-[#333333] bg-[#1a1a1a] py-1 px-0.5 text-[13px] shadow-xl"
+          style={{ top: sidebarContext.y, left: sidebarContext.x, color: '#e8e8e8' }}
+          onClick={(e) => e.stopPropagation()}
+          role="menu"
+          aria-label="Note and folder actions"
+        >
+          {sidebarMenuEntries.map((entry, i) => {
+            const active = sidebarContextMenuIndex === i
+            return (
+              <button
+                key={entry.action}
+                type="button"
+                role="menuitem"
+                className={[
+                  'flex w-full items-center rounded-md px-3 py-2 text-left transition-colors',
+                  active
+                    ? 'bg-[#2a2a2a] text-white'
+                    : entry.danger
+                      ? 'text-rose-400 hover:bg-[#353535] hover:text-rose-300'
+                      : 'text-[#e0e0e0] hover:bg-[#353535] hover:text-[#f9fafb]',
+                  entry.showStar ? 'justify-between gap-2' : '',
+                ].filter(Boolean).join(' ')}
+                onMouseEnter={() => {
+                  sidebarContextMenuIndexRef.current = i
+                  setSidebarContextMenuIndex(i)
+                }}
+                onClick={() => applySidebarAction(entry.action)}
+              >
+                <span>{entry.label}</span>
+                {entry.showStar ? <Star size={13} strokeWidth={1.75} className="shrink-0 opacity-90" /> : null}
+              </button>
+            )
+          })}
+        </div>
     )}
 
-    {/* Context + Slash menu — unchanged */}
-    {menu && (
+    {/* Unified format menu: same UI for / and right-click (source only affects deleting /) */}
+    {menu && formatMenuStylePos && (
       <div
-        className="fixed z-50 w-52 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] p-1 shadow-xl"
+        ref={formatMenuPopoverRef}
+        className="format-menu-popover fixed z-50 w-[min(18rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-[#333333] bg-[#1a1a1a] py-1.5 shadow-2xl shadow-black/40"
         style={{
-          top: showAbove ? menu.y - menuHeight : menu.y + 8,
-          left: Math.min(menu.x, window.innerWidth - 220),
+          top: formatMenuStylePos.top,
+          left: formatMenuStylePos.left,
         }}
         onClick={(e) => e.stopPropagation()}
+        role="listbox"
+        aria-label="Formatting"
       >
-        {menu.type === 'context' ? (
-          <>
-            <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Format</p>
-            <button onClick={() => applyCommand('h1')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm">Heading 1</button>
-            <button onClick={() => applyCommand('h2')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm">Heading 2</button>
-            <button onClick={() => applyCommand('bold')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm font-bold">Bold</button>
-            <button onClick={() => applyCommand('italic')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm italic">Italic</button>
-            <button onClick={() => applyCommand('highlight')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm text-yellow-400">Highlight</button>
-            <div className="my-1 border-t border-[#2a2a2a]" />
-            <button onClick={() => applyCommand('clear')} className="w-full text-left px-3 py-1.5 hover:bg-[#2a2a2a] rounded text-sm text-rose-400">Clear Formatting</button>
-          </>
-        ) : (
-          <>
-            <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-slate-500">Insert</p>
-            <div className="max-h-[160px] overflow-y-auto scroll-thin">
-              {SLASH_COMMANDS.map((item, i) => (
-                <button
-                  key={item.command}
-                  onClick={() => applySlashCommand(item.command)}
-                  className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors ${
-                    i === slashMenuIndex ? 'bg-indigo-600 text-white' : 'hover:bg-[#2a2a2a] text-slate-100'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+        <div className="border-b border-[#333333] px-3 pb-1.5 pt-0.5">
+          <p className="format-menu-header-title text-[11px] font-semibold uppercase tracking-[0.18em]">
+            Formatting
+          </p>
+          {/* <p className="text-[11px] text-slate-500">
+            Headings, text, lists, and blocks — same menu for / and right-click
+          </p> */}
+        </div>
+        <div
+          className="scroll-thin overflow-y-auto px-1.5 py-1"
+          style={{ maxHeight: FORMAT_MENU_LIST_MAX_PX }}
+        >
+          {FORMAT_MENU_GROUPS.map((group, gi) => {
+            let flatOffset = 0
+            for (let i = 0; i < gi; i++) flatOffset += FORMAT_MENU_GROUPS[i].items.length
+            return (
+              <div key={group.id} className="mb-2 last:mb-0">
+                {group.title && (
+                  <p className="format-menu-section-title px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider">
+                    {group.title}
+                  </p>
+                )}
+                {group.items.map((item, ii) => {
+                  const flatIndex = flatOffset + ii
+                  const selected = flatIndex === slashMenuIndex
+                  const isDanger = item.danger
+                  const Icon = FORMAT_MENU_ICON[item.command] ?? Pilcrow
+                  const labelClass = [
+                    'format-menu-label',
+                    'min-w-0 flex-1 truncate',
+                    selected && 'text-white',
+                    !selected && item.command === 'highlight' && 'format-menu-label--highlight',
+                    !selected && item.command === 'bold' && 'font-semibold',
+                    !selected && item.command === 'italic' && 'italic',
+                    !selected && !item.danger && item.command !== 'highlight' && 'text-[#d1d5db]',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                  const iconClass = [
+                    'format-menu-icon',
+                    item.command === 'highlight' && 'format-menu-icon--highlight',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                  return (
+                    <button
+                      key={`${group.id}-${item.command}-${ii}`}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      onMouseEnter={() => setSlashMenuIndex(flatIndex)}
+                      onClick={() => applyFormatMenuCommand(item.command)}
+                      className={[
+                        'format-menu-option',
+                        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
+                        selected && 'format-menu-option--selected',
+                        !selected && isDanger && 'format-menu-option--danger text-rose-400',
+                        !selected && !isDanger && 'text-[#d1d5db]',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      <Icon
+                        size={17}
+                        strokeWidth={2}
+                        className={iconClass}
+                        aria-hidden
+                      />
+                      <span className={labelClass}>
+                        {item.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
       </div>
     )}
   </div>
