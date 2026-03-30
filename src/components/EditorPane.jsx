@@ -3,7 +3,8 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Highlight from '@tiptap/extension-highlight'
 import Mathematics from '@tiptap/extension-mathematics'
-import { Star, Trash2 } from 'lucide-react'  // ✅ import icons
+import { CodeBlockWithToolbar } from './CodeBlockWithToolbar'
+import { Star, Trash2 } from 'lucide-react'
 import 'katex/dist/katex.min.css'
 
 export function EditorPane({
@@ -14,26 +15,30 @@ export function EditorPane({
   onEditorChange,
   onSlashKey,
   onContextMenu,
-  onSlashMenuKeyDown,
-  isSlashMenuOpen,
+  onFormatMenuKeyDown,
+  isFormatMenuOpen,
   onToggleFavorite,   // ✅ new prop
   onDeleteNote,
   setEditorInstance,
 }) {
-  const isSlashMenuOpenRef = useRef(isSlashMenuOpen)
-  const onSlashMenuKeyDownRef = useRef(onSlashMenuKeyDown)
+  const isFormatMenuOpenRef = useRef(isFormatMenuOpen)
+  const onFormatMenuKeyDownRef = useRef(onFormatMenuKeyDown)
   const onSlashKeyRef = useRef(onSlashKey)
   const onContextMenuRef = useRef(onContextMenu)
 
-  useEffect(() => { isSlashMenuOpenRef.current = isSlashMenuOpen }, [isSlashMenuOpen])
-  useEffect(() => { onSlashMenuKeyDownRef.current = onSlashMenuKeyDown }, [onSlashMenuKeyDown])
+  useEffect(() => { isFormatMenuOpenRef.current = isFormatMenuOpen }, [isFormatMenuOpen])
+  useEffect(() => { onFormatMenuKeyDownRef.current = onFormatMenuKeyDown }, [onFormatMenuKeyDown])
   useEffect(() => { onSlashKeyRef.current = onSlashKey }, [onSlashKey])
   useEffect(() => { onContextMenuRef.current = onContextMenu }, [onContextMenu])
 
   const editor = useEditor(
     {
       extensions: [
-        StarterKit.configure({ heading: { levels: [1, 2, 3, 4] } }),
+        StarterKit.configure({
+          heading: { levels: [1, 2, 3, 4] },
+          codeBlock: false,
+        }),
+        CodeBlockWithToolbar,
         Highlight,
         Mathematics,
       ],
@@ -95,15 +100,15 @@ export function EditorPane({
               return false
             }
 
-            // ✅ Slash menu keyboard nav (only when not in code block)
-            if (!isInCodeBlock && isSlashMenuOpenRef.current) {
-              const handled = onSlashMenuKeyDownRef.current(event)
+            // Format menu keyboard nav (only when not in code block)
+            if (!isInCodeBlock && isFormatMenuOpenRef.current) {
+              const handled = onFormatMenuKeyDownRef.current(event)
               if (handled) return true
               if (event.key === 'Backspace') {
-                onSlashMenuKeyDownRef.current({ key: 'Escape', preventDefault: () => {} })
+                onFormatMenuKeyDownRef.current({ key: 'Escape', preventDefault: () => {} })
               }
               if (event.key.length === 1 && event.key !== '/') {
-                onSlashMenuKeyDownRef.current({ key: 'Escape', preventDefault: () => {} })
+                onFormatMenuKeyDownRef.current({ key: 'Escape', preventDefault: () => {} })
               }
             }
 
@@ -157,10 +162,13 @@ return (
     <section className="flex-1 min-h-0 overflow-hidden flex flex-col">
       <div
         className="flex flex-col flex-1 min-h-0"
-        style={{ background: '#1a1a1a', padding: 'clamp(16px, 4vw, 64px)' }}
+        style={{
+          background: '#1a1a1a',
+          padding: 'clamp(10px, 2.4vw, 38px)',
+        }}
       >
-        {/* ✅ Header row — title + icons */}
-        <div className="flex items-start justify-between mb-1 gap-4">
+        {/* Header row — title + icons (~40% tighter spacing vs prior) */}
+        <div className="flex items-start justify-between mb-0.5 gap-4">
           <input
             type="text"
             value={selectedNote.title || ''}
@@ -177,7 +185,7 @@ return (
           />
 
           {/* ✅ Action icons */}
-          <div className="flex items-center gap-1 pt-1 flex-shrink-0">
+          <div className="flex items-center gap-1 pt-0.5 flex-shrink-0">
             {/* Favorite toggle */}
             <button
               type="button"
@@ -223,7 +231,7 @@ return (
         </div>
 
         {/* Last edited */}
-        <p className="mb-6 text-xs" style={{ color: '#3a3a3a' }}>
+        <p className="mb-3.5 text-xs" style={{ color: '#3a3a3a' }}>
           Last edited{' '}
           {selectedNote.updated_at
             ? new Date(selectedNote.updated_at).toLocaleString()
