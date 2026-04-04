@@ -135,6 +135,11 @@ function getFormatMenuPlacement(anchor) {
 
 function getSidebarContextMenuItems(item) {
   if (!item) return []
+  if (item.type === 'multi-note') {
+    return [
+      { action: 'delete-multi', label: `Delete ${item.noteIds.length} notes`, danger: true },
+    ]
+  }
   if (item.type === 'note') {
     return [
       { action: 'favorite', label: 'Add to Favourites', showStar: true },
@@ -172,6 +177,9 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(288) // 288px = w-72
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const [mobileView, setMobileView] = useState('sidebar')
+  const [selectedNoteIds, setSelectedNoteIds] = useState([])
   const isDraggingRef = useRef(false)
   const MIN_SIDEBAR = 180
   const MAX_SIDEBAR = 480
@@ -179,6 +187,13 @@ function App() {
   const HEADER_ROW_PX = 56
 
   sidebarContextRef.current = sidebarContext
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 767px)')
+    const handler = (e) => setIsMobile(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
 
   // ── Auth ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -219,6 +234,28 @@ function App() {
   
   const toggleSidebar = useCallback(() => {
     setSidebarOpen((open) => !open)
+  }, [])
+
+  const handleSelectNote = useCallback((noteId) => {
+    setSelectedNoteId(noteId)
+    setSelectedNoteIds([])
+    if (isMobile) setMobileView('editor')
+  }, [isMobile])
+
+  const handleToggleNoteSelection = useCallback((noteId) => {
+    setSelectedNoteIds(prev => {
+      if (prev.includes(noteId)) return prev.filter(id => id !== noteId)
+      const next = [...prev, noteId]
+      if (prev.length === 0 && selectedNoteId && selectedNoteId !== noteId) {
+        next.unshift(selectedNoteId)
+      }
+      return next
+    })
+  }, [selectedNoteId])
+
+  const handleMobileBack = useCallback(() => {
+    setMobileView('sidebar')
+    setSelectedNoteId(null)
   }, [])
 
   // Add drag handlers
@@ -456,21 +493,40 @@ function App() {
     if (!selectedNote) return
     const next = { ...selectedNote, ...changes, updated_at: new Date().toISOString() }
     setNotes((prev) => prev.map((n) => (n.id === selectedNote.id ? next : n)))
+    if (String(selectedNote.id).startsWith('temp-')) return
     const { error } = await supabase.from('notes').update(changes).eq('id', selectedNote.id)
     if (error) console.error('Error updating note', error)
   }
 
   const handleTitleChange = (e) => updateNoteContent({ title: e.target.value || 'Untitled' })
 
-  const handleCreateNote = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase.from('notes').insert([{
+  const handleCreateNote = useCallback(() => {
+    const tempId = `temp-${Date.now()}`
+    const now = new Date().toISOString()
+    const optimisticNote = {
+      id: tempId, user_id: user?.id, title: 'New Page', content: '',
+      folder_id: selectedFolderId, is_favorite: false, created_at: now, updated_at: now,
+    }
+    setNotes(prev => [optimisticNote, ...prev])
+    setSelectedNoteId(tempId)
+    if (isMobile) setMobileView('editor')
+
+    supabase.from('notes').insert([{
       user_id: user?.id, title: 'New Page', content: '', folder_id: selectedFolderId,
-    }]).select().single()
-    if (error) { console.error('Error creating note', error); return }
-    setNotes((prev) => [data, ...prev])
-    setSelectedNoteId(data.id)
-  }
+    }]).select().single().then(({ data, error }) => {
+      if (error) { console.error('Error creating note', error); return }
+      setNotes(prev => {
+        const temp = prev.find(n => n.id === tempId)
+        if (!temp) return prev
+        if (temp.title !== 'New Page' || temp.content !== '') {
+          supabase.from('notes').update({ title: temp.title, content: temp.content })
+            .eq('id', data.id).then(({ error: e }) => { if (e) console.error('Sync error', e) })
+        }
+        return prev.map(n => n.id === tempId ? { ...n, id: data.id, created_at: data.created_at } : n)
+      })
+      setSelectedNoteId(prev => prev === tempId ? data.id : prev)
+    })
+  }, [user?.id, selectedFolderId, isMobile])
 
   const handleCreateFolder = async () => {
     const tempId = `temp-folder-${Date.now()}`
@@ -489,13 +545,20 @@ function App() {
     if (!window.confirm('Delete this note?')) return
     setNotes((prev) => prev.filter((n) => n.id !== noteId))
     if (selectedNoteId === noteId) setSelectedNoteId(null)
-    const { error } = await supabase.from('notes').delete().eq('id', noteId)
-    if (error) console.error('Error deleting note', error)
+    if (!String(noteId).startsWith('temp-')) {
+      const { error } = await supabase.from('notes').delete().eq('id', noteId)
+      if (error) console.error('Error deleting note', error)
+    }
   }
 
   const handleSidebarContext = (e, item) => {
     e.preventDefault()
-    setSidebarContext({ x: e.clientX, y: e.clientY, item })
+    if (item.type === 'note' && selectedNoteIds.includes(item.note.id) && selectedNoteIds.length > 1) {
+      setSidebarContext({ x: e.clientX, y: e.clientY, item: { type: 'multi-note', noteIds: [...selectedNoteIds] } })
+    } else {
+      if (item.type === 'note' && !selectedNoteIds.includes(item.note.id)) setSelectedNoteIds([])
+      setSidebarContext({ x: e.clientX, y: e.clientY, item })
+    }
   }
 
   const closeSidebarContext = () => setSidebarContext(null)
@@ -524,6 +587,18 @@ function App() {
         await supabase.from('folders').delete().eq('id', target.folder.id)
       } else {
         await handleDeleteNote(target.note.id)
+      }
+    }
+    if (action === 'delete-multi' && target.type === 'multi-note') {
+      const ids = target.noteIds
+      if (!window.confirm(`Delete ${ids.length} notes?`)) { closeSidebarContext(); return }
+      setNotes(prev => prev.filter(n => !ids.includes(n.id)))
+      if (ids.includes(selectedNoteId)) setSelectedNoteId(null)
+      setSelectedNoteIds([])
+      const realIds = ids.filter(id => !String(id).startsWith('temp-'))
+      if (realIds.length > 0) {
+        const { error } = await supabase.from('notes').delete().in('id', realIds)
+        if (error) console.error('Error deleting notes', error)
       }
     }
     closeSidebarContext()
@@ -662,17 +737,22 @@ function App() {
   <div className="flex overflow-hidden text-[#c9c9c9]"
     style={{ background: '#0f0f0f', height: '100dvh' }}>
     <div className="relative flex w-full h-full" onClick={clearMenus}>
-      {/* One horizontal rule under the header row (sidebar title + top bar), full viewport width */}
-      <div
-        className="pointer-events-none absolute left-0 right-0 z-20 h-px bg-[#333333]"
-        style={{ top: HEADER_ROW_PX }}
-        aria-hidden
-      />
+      {/* One horizontal rule under the header row — hidden on mobile */}
+      {!isMobile && (
+        <div
+          className="pointer-events-none absolute left-0 right-0 z-20 h-px bg-[#333333]"
+          style={{ top: HEADER_ROW_PX }}
+          aria-hidden
+        />
+      )}
 
-      {/* Sidebar column: width animates when toggled */}
+      {/* Sidebar column: full-width on mobile, animated width on desktop */}
       <div
         className="flex-shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
-        style={{ width: sidebarOpen ? `${sidebarWidth}px` : 0 }}
+        style={{
+          width: isMobile ? '100%' : (sidebarOpen ? `${sidebarWidth}px` : 0),
+          display: isMobile && mobileView !== 'sidebar' ? 'none' : undefined,
+        }}
       >
         <Sidebar
           activeTab={activeTab}
@@ -684,7 +764,7 @@ function App() {
           selectedFolderId={selectedFolderId}
           onSelectFolder={setSelectedFolderId}
           selectedNoteId={selectedNoteId}
-          onSelectNote={setSelectedNoteId}
+          onSelectNote={handleSelectNote}
           onCreateNote={handleCreateNote}
           onCreateFolder={handleCreateFolder}
           onSidebarContext={handleSidebarContext}
@@ -695,11 +775,17 @@ function App() {
           openFolders={openFolders}
           onToggleFolderOpen={handleToggleFolderOpen}
           onCloseSidebarContext={closeSidebarContext}
+          sidebarContext={sidebarContext}
+          selectedNoteIds={selectedNoteIds}
+          onToggleNoteSelection={handleToggleNoteSelection}
+          isMobile={isMobile}
+          onChangeSearch={setSearch}
+          onLogout={handleLogout}
         />
       </div>
 
-      {/* Drag handle between sidebar and editor (hidden when sidebar collapsed) */}
-      {sidebarOpen && (
+      {/* Drag handle — desktop only */}
+      {!isMobile && sidebarOpen && (
         <div
           className="flex-shrink-0 w-1 cursor-col-resize flex items-center justify-center group"
           style={{ background: '#1a1a1a' }}
@@ -713,16 +799,24 @@ function App() {
         </div>
       )}
 
-      <main className="flex flex-1 flex-col bg-[#1a1a1a] min-h-0 overflow-hidden min-w-0">
+      <main
+        className="flex flex-1 flex-col bg-[#1a1a1a] min-h-0 overflow-hidden min-w-0"
+        style={{ display: isMobile && mobileView !== 'editor' ? 'none' : undefined }}
+      >
         <TopBar
           notes={notes}
           search={search}
           onChangeSearch={setSearch}
-          onSelectNote={setSelectedNoteId}
+          onSelectNote={handleSelectNote}
           user={user}
           onLogout={handleLogout}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={toggleSidebar}
+          isMobile={isMobile}
+          onMobileBack={handleMobileBack}
+          selectedNote={selectedNote}
+          onToggleFavorite={handleToggleFavorite}
+          onDeleteNote={handleDeleteNote}
         />
         <EditorPane
           loading={loading}
@@ -738,6 +832,7 @@ function App() {
           setEditorInstance={setEditor}
           onToggleFavorite={handleToggleFavorite}
           onDeleteNote={handleDeleteNote}
+          isMobile={isMobile}
         />
       </main>
     </div>
