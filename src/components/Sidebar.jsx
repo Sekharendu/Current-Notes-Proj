@@ -76,23 +76,23 @@ export function Sidebar({
       style={{ background: isMobile ? c.sidebarMobileBg : c.sidebarBg, borderRight: isMobile ? 'none' : `1px solid ${c.border}` }}>
 
       {/* Header — on mobile acts as user menu button */}
-      <div className="relative flex h-14 shrink-0 items-center justify-between px-4" ref={isMobile ? userMenuRef : undefined}>
+      <div className={classNames("relative flex shrink-0 items-center justify-between", isMobile ? "h-16 px-5" : "h-14 px-4")} ref={isMobile ? userMenuRef : undefined}>
         {isMobile ? (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(prev => !prev) }}
             className="flex items-center gap-2 min-w-0"
           >
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg" aria-hidden>
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg" aria-hidden>
               <KiroBitLogo variant="minimal" size="xs" />
             </span>
             <div className="flex flex-col min-w-0 text-left">
-              <span className="text-sm font-semibold tracking-tight truncate min-w-0" style={{ color: c.textHeading }}>
+              <span className="text-base font-semibold tracking-tight truncate min-w-0" style={{ color: c.textHeading }}>
                 {user?.user_metadata?.full_name || user?.user_metadata?.name || 'User'}&apos;s Notes
               </span>
-              <span className="text-[11px]" style={{ color: c.textSubtle }}>Personal workspace</span>
+              <span className="text-xs" style={{ color: c.textSubtle }}>Personal workspace</span>
             </div>
-            <ChevronDown size={14} strokeWidth={2} className="flex-shrink-0 ml-0.5" style={{ color: c.textSubtle }} />
+            <ChevronDown size={16} strokeWidth={2} className="flex-shrink-0 ml-0.5" style={{ color: c.textSubtle }} />
           </button>
         ) : (
           <div className="flex items-center gap-2 min-w-0">
@@ -142,11 +142,11 @@ export function Sidebar({
         )}
       </div>
 
-      <div className="flex items-center gap-2 px-3 py-2"
+      <div className={classNames("flex items-center gap-2", isMobile ? "px-4 py-3" : "px-3 py-2")}
         style={{ borderBottom: `1px solid ${c.border}` }}>
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+          className={classNames("flex items-center justify-center rounded-md transition-colors", isMobile ? "h-10 w-10" : "h-8 w-8")}
           style={activeTab === SidebarTabs.ALL
             ? { background: c.tabActiveBg, color: c.textHeading }
             : { color: c.iconMuted }}
@@ -154,12 +154,12 @@ export function Sidebar({
           onMouseLeave={(e) => { if (activeTab !== SidebarTabs.ALL) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.iconMuted } }}
           onClick={(e) => { e.stopPropagation(); onChangeTab(SidebarTabs.ALL); onSelectFolder(null) }}
         >
-          <List size={17} strokeWidth={1.75} />
+          <List size={isMobile ? 20 : 17} strokeWidth={1.75} />
         </button>
 
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+          className={classNames("flex items-center justify-center rounded-md transition-colors", isMobile ? "h-10 w-10" : "h-8 w-8")}
           style={activeTab === SidebarTabs.FAVORITES
             ? { background: c.tabActiveBg, color: c.favorite }
             : { color: c.iconMuted }}
@@ -168,60 +168,60 @@ export function Sidebar({
           onClick={(e) => { e.stopPropagation(); onChangeTab(SidebarTabs.FAVORITES); onSelectFolder(null) }}
           title="Favorites"
         >
-          <Star size={17} strokeWidth={1.75} fill={activeTab === SidebarTabs.FAVORITES ? c.favorite : 'none'} />
+          <Star size={isMobile ? 20 : 17} strokeWidth={1.75} fill={activeTab === SidebarTabs.FAVORITES ? c.favorite : 'none'} />
         </button>
 
         <button
           type="button"
-          className="ml-auto flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+          className={classNames("ml-auto flex items-center justify-center rounded-md transition-colors", isMobile ? "h-10 w-10" : "h-8 w-8")}
           style={{ color: c.icon }}
           onMouseEnter={(e) => { e.currentTarget.style.background = c.hover; e.currentTarget.style.color = c.textBright }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.icon }}
           onClick={(e) => { e.stopPropagation(); onCreateNote() }}
           title="New note"
         >
-          <Plus size={17} strokeWidth={1.75} />
+          <Plus size={isMobile ? 20 : 17} strokeWidth={1.75} />
         </button>
 
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+          className={classNames("flex items-center justify-center rounded-md transition-colors", isMobile ? "h-10 w-10" : "h-8 w-8")}
           style={{ color: c.iconMuted }}
           onMouseEnter={(e) => { e.currentTarget.style.background = c.contextHoverAlt; e.currentTarget.style.color = c.hoverText }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.iconMuted }}
           onClick={(e) => { e.stopPropagation(); onCreateFolder() }}
           title="New folder"
         >
-          <FolderPlus size={17} strokeWidth={1.75} />
+          <FolderPlus size={isMobile ? 20 : 17} strokeWidth={1.75} />
         </button>
       </div>
 
       {/* Mobile search bar */}
       {isMobile && (
-        <div className="relative px-3 py-2" style={{ borderBottom: `1px solid ${c.border}` }} ref={searchRef}>
+        <div className="relative px-4 py-3" style={{ borderBottom: `1px solid ${c.border}` }} ref={searchRef}>
           <div
-            className="flex items-center gap-2 px-3 py-1.5"
+            className="flex items-center gap-2 px-3 py-2"
             style={showMobileSearch
               ? { background: c.searchBg, border: `1px solid ${c.border}`, borderBottom: 'none', borderRadius: '6px 6px 0 0' }
               : { background: c.searchBg, border: `1px solid ${c.border}`, borderRadius: '6px' }}
           >
-            <Search size={14} style={{ color: c.iconDark }} />
+            <Search size={16} style={{ color: c.iconDark }} />
             <input
               ref={searchInputRef}
               value={search}
               onChange={(e) => { onChangeSearch?.(e.target.value); setIsSearchOpen(true) }}
               onFocus={() => search.trim() && setIsSearchOpen(true)}
               placeholder="Search notes..."
-              className="w-full min-w-0 bg-transparent text-sm focus:outline-none"
+              className="w-full min-w-0 bg-transparent text-base focus:outline-none"
               style={{ color: c.text }}
             />
             {search && (
               <button
                 onClick={() => { onChangeSearch?.(''); setIsSearchOpen(false) }}
-                className="text-xs transition-colors"
+                className="text-sm transition-colors"
                 style={{ color: c.textMuted }}
               >
-                <X size={12} />
+                <X size={14} />
               </button>
             )}
           </div>
@@ -253,7 +253,7 @@ export function Sidebar({
       )}
 
       {/* Scrollable list */}
-      <div className="scroll-thin flex-1 overflow-y-auto px-2 py-2"
+      <div className={classNames("scroll-thin flex-1 overflow-y-auto", isMobile ? "px-3 py-3" : "px-2 py-2")}
         onClick={(e) => {
           e.stopPropagation()
           onCloseSidebarContext()
@@ -263,10 +263,10 @@ export function Sidebar({
         {activeTab === SidebarTabs.ALL && folders.map((folder) => (
           <div key={folder.id} className="mb-0.5">
             {editingItem && editingItem.kind === 'folder' && editingItem.id === folder.id ? (
-              <div className="flex items-center rounded-md px-2.5 py-2.5 text-[15px] leading-snug"
+              <div className={classNames("flex items-center rounded-md px-2.5 leading-snug", isMobile ? "py-3 text-[17px]" : "py-2.5 text-[15px]")}
                 style={{ color: c.icon }}>
-                <ChevronDown size={16} strokeWidth={1.75} className="mr-1 flex-shrink-0" style={{ color: c.iconMuted }} />
-                <Folder size={17} strokeWidth={1.75} className="mr-2 flex-shrink-0" style={{ color: c.icon }} />
+                <ChevronDown size={isMobile ? 18 : 16} strokeWidth={1.75} className="mr-1 flex-shrink-0" style={{ color: c.iconMuted }} />
+                <Folder size={isMobile ? 19 : 17} strokeWidth={1.75} className="mr-2 flex-shrink-0" style={{ color: c.icon }} />
                 <input
                   autoFocus
                   value={editingItem.tempName}
@@ -276,7 +276,7 @@ export function Sidebar({
                     if (e.key === 'Enter') { e.preventDefault(); onCommitEditing() }
                     if (e.key === 'Escape') { e.preventDefault(); onCancelEditing() }
                   }}
-                  className="w-full rounded-sm px-1 py-0.5 text-[15px] outline-none"
+                  className={classNames("w-full rounded-sm px-1 py-0.5 outline-none", isMobile ? "text-[17px]" : "text-[15px]")}
                   style={{ background: c.inputBg, color: c.textHeading, border: `1px solid ${c.inputBorder}` }}
                 />
               </div>
@@ -285,7 +285,7 @@ export function Sidebar({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onToggleFolderOpen(folder.id); onSelectFolder(folder.id) }}
                 onContextMenu={(e) => onSidebarContext(e, { type: 'folder', folder })}
-                className="flex w-full items-center justify-between rounded-md px-2.5 py-2.5 text-left text-[15px] font-medium leading-snug transition-colors"
+                className={classNames("flex w-full items-center justify-between rounded-md px-2.5 text-left font-medium leading-snug transition-colors", isMobile ? "py-3 text-[17px]" : "py-2.5 text-[15px]")}
                 style={
                   !isMobile && selectedFolderId === folder.id && !selectedNoteId
                     ? { background: c.selected, color: c.selectedText }
@@ -309,10 +309,10 @@ export function Sidebar({
               >
                 <span className="flex items-center gap-2 min-w-0 flex-1">
                   {openFolders.includes(folder.id)
-                    ? <ChevronDown size={16} strokeWidth={1.75} className="flex-shrink-0" style={{ color: c.iconMuted }} />
-                    : <ChevronRight size={16} strokeWidth={1.75} className="flex-shrink-0" style={{ color: c.iconMuted }} />
+                    ? <ChevronDown size={isMobile ? 18 : 16} strokeWidth={1.75} className="flex-shrink-0" style={{ color: c.iconMuted }} />
+                    : <ChevronRight size={isMobile ? 18 : 16} strokeWidth={1.75} className="flex-shrink-0" style={{ color: c.iconMuted }} />
                   }
-                  <Folder size={17} strokeWidth={1.75} className="flex-shrink-0" style={{ color: c.icon }} />
+                  <Folder size={isMobile ? 19 : 17} strokeWidth={1.75} className="flex-shrink-0" style={{ color: c.icon }} />
                   <span className="truncate min-w-0">{folder.name || 'New Folder'}</span>
                 </span>
               </button>
@@ -322,7 +322,7 @@ export function Sidebar({
             {openFolders.includes(folder.id) &&
               notes.filter((n) => n.folder_id === folder.id).map((note) => (
                 editingItem && editingItem.kind === 'note' && editingItem.id === note.id ? (
-                  <div key={note.id} className={classNames('ml-6 mt-0.5 flex w-[calc(100%-1.5rem)] items-center rounded-md px-2.5 leading-snug', isMobile ? 'py-2.5 text-[15px]' : 'py-1.5 text-[14px]')}
+                  <div key={note.id} className={classNames('ml-6 mt-0.5 flex w-[calc(100%-1.5rem)] items-center rounded-md px-2.5 leading-snug', isMobile ? 'py-3 text-[17px]' : 'py-1.5 text-[14px]')}
                     style={{ color: c.icon }}>
                     <input
                       autoFocus
@@ -333,7 +333,7 @@ export function Sidebar({
                         if (e.key === 'Enter') { e.preventDefault(); onCommitEditing() }
                         if (e.key === 'Escape') { e.preventDefault(); onCancelEditing() }
                       }}
-                      className={classNames('w-full rounded-sm px-1 py-0.5 outline-none', isMobile ? 'text-[15px]' : 'text-[14px]')}
+                      className={classNames('w-full rounded-sm px-1 py-0.5 outline-none', isMobile ? 'text-[17px]' : 'text-[14px]')}
                       style={{ background: c.inputBg, color: c.textHeading, border: `1px solid ${c.inputBorder}` }}
                     />
                   </div>
@@ -349,7 +349,7 @@ export function Sidebar({
                     onContextMenu={(e) => onSidebarContext(e, { type: 'note', note })}
                     className={classNames(
                       'ml-6 mt-0.5 mb-0.5 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-md px-2.5 text-left leading-snug transition-colors',
-                      isMobile ? 'py-2.5 text-[15px] active:scale-[0.97] active:opacity-80' : 'py-1.5 text-[14px]',
+                      isMobile ? 'py-3 text-[17px] active:scale-[0.97] active:opacity-80' : 'py-1.5 text-[14px]',
                     )}
                     style={
                       !isMobile && selectedNoteId === note.id
@@ -378,17 +378,17 @@ export function Sidebar({
                     }}
                   >
                     <FileText
-                      size={15}
+                      size={isMobile ? 17 : 15}
                       strokeWidth={1.75}
                       className="flex-shrink-0"
                       style={{ color: c.iconMuted }}
                     />
                     <span className="flex-1 truncate">{note.title || 'Untitled'}</span>
-                    {note.is_favorite && <Star size={13} fill={c.favorite} color={c.favorite} className="flex-shrink-0" />}
+                    {note.is_favorite && <Star size={isMobile ? 15 : 13} fill={c.favorite} color={c.favorite} className="flex-shrink-0" />}
                     {isMobile && (
                       <button
                         type="button"
-                        className="flex-shrink-0 flex items-center justify-center h-6 w-6 rounded transition-colors"
+                        className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded transition-colors"
                         style={{ color: c.iconMuted }}
                         onClick={(e) => {
                           e.stopPropagation()
@@ -403,7 +403,7 @@ export function Sidebar({
                           onSidebarContext({ preventDefault: () => {}, clientX: x, clientY: y }, { type: 'note', note })
                         }}
                       >
-                        <MoreHorizontal size={14} strokeWidth={2} />
+                        <MoreHorizontal size={16} strokeWidth={2} />
                       </button>
                     )}
                   </button>
@@ -422,7 +422,7 @@ export function Sidebar({
             .filter((n) => activeTab === SidebarTabs.FAVORITES ? true : !n.folder_id)
             .map((note) => (
               editingItem && editingItem.kind === 'note' && editingItem.id === note.id ? (
-                <div key={note.id} className={classNames('flex items-center rounded-md px-2.5 leading-snug', isMobile ? 'py-2.5 text-[15px]' : 'py-1.5 text-[14px]')}
+                <div key={note.id} className={classNames('flex items-center rounded-md px-2.5 leading-snug', isMobile ? 'py-2.5 text-[17px]' : 'py-1.5 text-[14px]')}
                   style={{ color: c.icon }}>
                   <input
                     autoFocus
@@ -433,7 +433,7 @@ export function Sidebar({
                       if (e.key === 'Enter') { e.preventDefault(); onCommitEditing() }
                       if (e.key === 'Escape') { e.preventDefault(); onCancelEditing() }
                     }}
-                    className={classNames('w-full rounded-sm px-1 py-0.5 outline-none', isMobile ? 'text-[15px]' : 'text-[14px]')}
+                    className={classNames('w-full rounded-sm px-1 py-0.5 outline-none', isMobile ? 'text-[17px]' : 'text-[14px]')}
                     style={{ background: c.inputBg, color: c.textHeading, border: `1px solid ${c.inputBorder}` }}
                   />
                 </div>
@@ -448,8 +448,8 @@ export function Sidebar({
                   }}
                   onContextMenu={(e) => onSidebarContext(e, { type: 'note', note })}
                   className={classNames(
-                    'flex w-full items-center gap-2 rounded-md px-2.5 mb-0.5 text-left leading-snug transition-colors',
-                    isMobile ? 'py-2.5 text-[15px] active:scale-[0.97] active:opacity-80' : 'py-1.5 text-[14px]',
+                    'flex w-full items-center gap-2 rounded-md px-2.5 text-left leading-snug transition-colors',
+                    isMobile ? 'py-2 text-[17px] active:scale-[0.97] active:opacity-80' : 'mb-0.5 py-1.5 text-[14px]',
                   )}
                   style={
                     !isMobile && selectedNoteId === note.id
@@ -478,17 +478,17 @@ export function Sidebar({
                   }}
                 >
                   <FileText
-                    size={16}
+                    size={isMobile ? 18 : 16}
                     strokeWidth={1.75}
                     className="flex-shrink-0"
                     style={{ color: c.iconMuted }}
                   />
                   <span className="flex-1 truncate min-w-0">{note.title || 'Untitled'}</span>
-                  {note.is_favorite && <Star size={13} fill={c.favorite} color={c.favorite} className="flex-shrink-0" />}
+                  {note.is_favorite && <Star size={isMobile ? 15 : 13} fill={c.favorite} color={c.favorite} className="flex-shrink-0" />}
                   {isMobile && (
                     <button
                       type="button"
-                      className="flex-shrink-0 flex items-center justify-center h-7 w-7 rounded transition-colors"
+                      className="flex-shrink-0 flex items-center justify-center h-9 w-9 rounded transition-colors"
                       style={{ color: c.iconMuted }}
                       onClick={(e) => {
                         e.stopPropagation()
@@ -503,7 +503,7 @@ export function Sidebar({
                         onSidebarContext({ preventDefault: () => {}, clientX: x, clientY: y }, { type: 'note', note })
                       }}
                     >
-                      <MoreHorizontal size={16} strokeWidth={2} />
+                      <MoreHorizontal size={18} strokeWidth={2} />
                     </button>
                   )}
                 </button>

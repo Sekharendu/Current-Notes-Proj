@@ -790,13 +790,14 @@ function App() {
         />
       )}
 
-      {/* Sidebar column: full-width on mobile, animated width on desktop */}
+      {/* Sidebar column: overlay on mobile, animated width on desktop */}
       <div
-        className="flex-shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
-        style={{
-          width: isMobile ? '100%' : (sidebarOpen ? `${sidebarWidth}px` : 0),
-          display: isMobile && mobileView !== 'sidebar' ? 'none' : undefined,
-        }}
+        className={isMobile
+          ? "absolute inset-0 z-30 transition-transform duration-300 ease-out"
+          : "flex-shrink-0 overflow-hidden transition-[width] duration-300 ease-out"}
+        style={isMobile
+          ? { transform: mobileView === 'sidebar' ? 'translateX(0)' : 'translateX(-100%)' }
+          : { width: sidebarOpen ? `${sidebarWidth}px` : 0 }}
       >
         <Sidebar
           activeTab={activeTab}
@@ -846,7 +847,7 @@ function App() {
 
       <main
         className="flex flex-1 flex-col min-h-0 overflow-hidden min-w-0"
-        style={{ background: c.mainBg, display: isMobile && mobileView !== 'editor' ? 'none' : undefined }}
+        style={{ background: c.mainBg }}
       >
         <TopBar
           notes={notes}
