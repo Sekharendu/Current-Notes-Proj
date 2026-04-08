@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Search, X, PanelLeftClose, PanelLeft, ChevronLeft, Star, Trash2 } from 'lucide-react'
+import { Search, X, PanelLeftClose, PanelLeft, ChevronLeft, Star, Trash2, Sun, Moon } from 'lucide-react'
 import PropTypes from 'prop-types'
+import { getColors } from '../theme'
 
 export function TopBar({
   notes,
@@ -16,7 +17,10 @@ export function TopBar({
   selectedNote,
   onToggleFavorite,
   onDeleteNote,
+  theme = 'dark',
+  onToggleTheme,
 }) {
+  const c = getColors(theme)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const searchRef = useRef(null)
@@ -73,14 +77,13 @@ export function TopBar({
                     || user?.user_metadata?.picture   // ✅ Google fallback
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 bg-[#1a1a1a] px-4 pl-3 flex-shrink-0">
-      {/* Sidebar toggle (desktop) / Back button (mobile) */}
+    <header className="flex h-14 shrink-0 items-center gap-3 px-4 pl-3 flex-shrink-0" style={{ background: c.mainBg }}>
       {isMobile ? (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onMobileBack?.() }}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[#262626]"
-          style={{ color: '#9ca3af' }}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors"
+          style={{ color: c.icon }}
           aria-label="Back to notes"
           title="Back to notes"
         >
@@ -90,8 +93,10 @@ export function TopBar({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleSidebar() }}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[#262626]"
-          style={{ color: '#9ca3af' }}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors"
+          style={{ color: c.icon }}
+          onMouseEnter={(e) => e.currentTarget.style.background = c.hover}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
           aria-expanded={sidebarOpen}
           aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
@@ -100,18 +105,16 @@ export function TopBar({
         </button>
       )}
 
-      {/* Spacer on mobile, search on desktop */}
       {isMobile && <div className="flex-1" />}
       <div className={`relative flex min-w-0 flex-1 justify-center${isMobile ? ' hidden' : ''}`}>
         <div className="relative w-[65%] min-w-0 max-w-full" ref={searchRef}>
           <div
-            className={
-              showSearchPanel
-                ? 'flex items-center gap-2 rounded-t-md rounded-b-none bg-[#161616] border border-[#333333] border-b-0 px-3 py-1.5'
-                : 'flex items-center gap-2 rounded-md bg-[#161616] border border-[#333333] px-3 py-1.5'
-            }
+            className="flex items-center gap-2 px-3 py-1.5"
+            style={showSearchPanel
+              ? { background: c.searchBg, border: `1px solid ${c.border}`, borderBottom: 'none', borderRadius: '6px 6px 0 0' }
+              : { background: c.searchBg, border: `1px solid ${c.border}`, borderRadius: '6px' }}
           >
-          <Search size={14} style={{ color: '#444444' }} />
+          <Search size={14} style={{ color: c.iconDark }} />
           <input
             ref={searchInputRef}
             value={search}
@@ -119,28 +122,28 @@ export function TopBar({
             onFocus={() => search.trim() && setIsSearchOpen(true)}
             placeholder="Search notes (Ctrl+K)"
             className="w-full min-w-0 bg-transparent text-sm focus:outline-none"
-            style={{ color: '#c9c9c9' }}
+            style={{ color: c.text }}
           />
           {search && (
             <button
               onClick={() => { onChangeSearch(''); setIsSearchOpen(false) }}
               className="text-xs transition-colors"
-              style={{ color: '#555555' }}
+              style={{ color: c.textMuted }}
             >
               <X size={12} />
             </button>
           )}
           </div>
 
-          {/* Search dropdown — flush under search field; thin scrollbar matches editor */}
           {showSearchPanel && (
-          <div className="absolute left-0 right-0 top-full z-50 rounded-b-lg rounded-t-none border border-[#333333] border-t-0 bg-[#1a1a1a] shadow-2xl overflow-hidden">
+          <div className="absolute left-0 right-0 top-full z-50 rounded-b-lg rounded-t-none shadow-2xl overflow-hidden"
+            style={{ background: c.searchResultBg, border: `1px solid ${c.border}`, borderTop: 'none' }}>
             {filteredNotes.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-center" style={{ color: '#555555' }}>
+              <p className="px-4 py-3 text-sm text-center" style={{ color: c.textMuted }}>
                 No results found
               </p>
             ) : (
-              <ul className="scroll-thin max-h-[224px] overflow-y-auto divide-y divide-[#2a2a2a]">
+              <ul className="scroll-thin max-h-[224px] overflow-y-auto" style={{ borderColor: c.borderLight }}>
                 {filteredNotes.map((note) => (
                   <li
                     key={note.id}
@@ -150,14 +153,14 @@ export function TopBar({
                       setIsSearchOpen(false)
                     }}
                     className="flex cursor-pointer flex-col gap-0.5 px-4 py-3 transition-colors"
-                    style={{ color: '#c9c9c9' }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#232323'}
+                    style={{ color: c.text, borderBottom: `1px solid ${c.borderLight}` }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = c.searchResultHover}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <span className="text-sm font-medium truncate" style={{ color: '#e0e0e0' }}>
+                    <span className="text-sm font-medium truncate" style={{ color: c.textBright }}>
                       {note.title || 'Untitled'}
                     </span>
-                    <span className="text-xs truncate" style={{ color: '#555555' }}>
+                    <span className="text-xs truncate" style={{ color: c.textMuted }}>
                       {note.content?.replace(/<[^>]*>/g, '').slice(0, 60)}...
                     </span>
                   </li>
@@ -169,7 +172,6 @@ export function TopBar({
         </div>
       </div>
 
-      {/* Mobile: star + trash actions | Desktop: avatar */}
       {isMobile ? (
         selectedNote && (
           <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -177,16 +179,16 @@ export function TopBar({
               type="button"
               onClick={() => onToggleFavorite?.(selectedNote)}
               className="flex items-center justify-center h-9 w-9 rounded-md transition-colors"
-              style={{ color: selectedNote.is_favorite ? '#eab308' : '#555555' }}
+              style={{ color: selectedNote.is_favorite ? c.favorite : c.textMuted }}
               title={selectedNote.is_favorite ? 'Remove from favourites' : 'Add to favourites'}
             >
-              <Star size={18} fill={selectedNote.is_favorite ? '#eab308' : 'none'} strokeWidth={1.75} />
+              <Star size={18} fill={selectedNote.is_favorite ? c.favorite : 'none'} strokeWidth={1.75} />
             </button>
             <button
               type="button"
               onClick={() => onDeleteNote?.(selectedNote.id)}
               className="flex items-center justify-center h-9 w-9 rounded-md transition-colors"
-              style={{ color: '#555555' }}
+              style={{ color: c.textMuted }}
               title="Delete note"
             >
               <Trash2 size={18} strokeWidth={1.75} />
@@ -205,12 +207,12 @@ export function TopBar({
                 alt="Profile"
                 referrerPolicy="no-referrer"
                 className="h-8 w-8 rounded-full object-cover"
-                style={{ border: '2px solid #3a3a3a' }}
+                style={{ border: `2px solid ${c.avatarBorder}` }}
               />
             ) : (
               <div
-                className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold text-white"
-                style={{ background: '#2a2a2a', border: '2px solid #3a3a3a' }}
+                className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold"
+                style={{ background: c.avatarBg, border: `2px solid ${c.avatarBorder}`, color: c.textHeading }}
               >
                 {user?.email?.[0]?.toUpperCase() ?? '?'}
               </div>
@@ -219,25 +221,35 @@ export function TopBar({
 
           {isUserMenuOpen && (
             <div
-              className="absolute right-0 top-full z-50 mt-2 w-44 rounded-lg shadow-2xl overflow-hidden"
-              style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }}
+              className="absolute right-0 top-full z-50 mt-2 w-48 rounded-lg shadow-2xl overflow-hidden"
+              style={{ background: c.menuBg, border: `1px solid ${c.border}` }}
             >
-              <div className="px-3 py-2" style={{ borderBottom: '1px solid #2a2a2a' }}>
-                <p className="text-xs font-medium truncate" style={{ color: '#e0e0e0' }}>
+              <div className="px-3 py-2" style={{ borderBottom: `1px solid ${c.border}` }}>
+                <p className="text-xs font-medium truncate" style={{ color: c.textBright }}>
                   {user?.user_metadata?.full_name
                     || user?.user_metadata?.user_name
                     || user?.user_metadata?.name
                     || 'User'}
                 </p>
-                <p className="text-[11px] truncate" style={{ color: '#555555' }}>
+                <p className="text-[11px] truncate" style={{ color: c.textMuted }}>
                   {user?.email}
                 </p>
               </div>
               <button
+                onClick={() => { onToggleTheme?.(); setIsUserMenuOpen(false) }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
+                style={{ color: c.text, borderBottom: `1px solid ${c.border}` }}
+                onMouseEnter={(e) => e.currentTarget.style.background = c.menuHover}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                {theme === 'dark' ? <Sun size={15} strokeWidth={1.75} /> : <Moon size={15} strokeWidth={1.75} />}
+                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              </button>
+              <button
                 onClick={() => { onLogout(); setIsUserMenuOpen(false) }}
                 className="w-full px-3 py-2 text-left text-sm transition-colors"
-                style={{ color: '#f87171' }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#232323'}
+                style={{ color: c.danger }}
+                onMouseEnter={(e) => e.currentTarget.style.background = c.menuHover}
                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
               >
                 Log out
@@ -264,4 +276,6 @@ TopBar.propTypes = {
   selectedNote: PropTypes.object,
   onToggleFavorite: PropTypes.func,
   onDeleteNote: PropTypes.func,
+  theme: PropTypes.string,
+  onToggleTheme: PropTypes.func,
 }
