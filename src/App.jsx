@@ -944,6 +944,7 @@ function App() {
           background: c.contextBg,
           border: `1px solid ${c.border}`,
         }}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => e.stopPropagation()}
         role="listbox"
         aria-label="Formatting"
@@ -1055,6 +1056,7 @@ function App() {
           border: `1px solid ${c.border}`,
           minWidth: 160,
         }}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => e.stopPropagation()}
         onMouseLeave={() => setColorSubmenu(null)}
       >
