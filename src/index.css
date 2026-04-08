@@ -23,6 +23,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-theme="light"] body {
+  background: #ffffff;
+  color: #374151;
+}
+
 
 #root {
   height: 100vh;
@@ -39,6 +44,12 @@ body {
 .scroll-thin::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
 .scroll-thin::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
 
+[data-theme="light"] .scroll-thin {
+  scrollbar-color: #d1d5db transparent;
+}
+[data-theme="light"] .scroll-thin::-webkit-scrollbar-thumb { background: #d1d5db; }
+[data-theme="light"] .scroll-thin::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
 /* ── Menu button base ──────────────────────────────────── */
 .menu-btn {
   width: 100%;
@@ -49,6 +60,11 @@ body {
   color: #c9c9c9;
 }
 .menu-btn:hover { background-color: #2a2a2a; }
+
+[data-theme="light"] .menu-btn {
+  color: #374151;
+}
+[data-theme="light"] .menu-btn:hover { background-color: #f3f4f6; }
 
 /* ── Format menu (/) + right-click — emerald headers; neutral rows; emerald only when selected ── */
 .format-menu-popover .format-menu-header-title {
@@ -117,6 +133,38 @@ body {
 .format-menu-popover button.format-menu-option:not(.format-menu-option--selected).format-menu-option--danger .format-menu-label,
 .format-menu-popover button.format-menu-option:not(.format-menu-option--selected).format-menu-option--danger .format-menu-icon {
   color: #ef4444;
+}
+
+/* ── Light theme: format menu overrides ── */
+[data-theme="light"] .format-menu-popover .format-menu-header-title {
+  color: #059669;
+}
+[data-theme="light"] .format-menu-popover .format-menu-section-title {
+  color: #059669;
+}
+[data-theme="light"] .format-menu-popover button.format-menu-option:not(.format-menu-option--selected):hover {
+  background-color: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+[data-theme="light"] .format-menu-popover button.format-menu-option:not(.format-menu-option--selected):hover .format-menu-icon {
+  color: #6b7280 !important;
+}
+[data-theme="light"] .format-menu-popover button.format-menu-option--selected {
+  background-color: #e5e7eb !important;
+  color: #111827 !important;
+}
+[data-theme="light"] .format-menu-popover button.format-menu-option--selected:hover {
+  background-color: #e5e7eb !important;
+  color: #111827 !important;
+}
+[data-theme="light"] .format-menu-popover button.format-menu-option--selected .format-menu-label {
+  color: #111827 !important;
+}
+[data-theme="light"] .format-menu-popover button.format-menu-option--selected .format-menu-icon:not(.format-menu-icon--highlight) {
+  color: #374151 !important;
+}
+[data-theme="light"] .format-menu-popover .format-menu-icon {
+  color: #9ca3af;
 }
 
 /* ── TipTap Editor Typography ──────────────────────────── */
@@ -266,5 +314,89 @@ body {
 
 .tiptap ul ul ul {
   list-style-type: square !important;
+}
+
+/* ── Light theme: TipTap overrides ── */
+[data-theme="light"] .tiptap h1 {
+  background: linear-gradient(135deg, #111827 0%, #6b7280 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme="light"] .tiptap h2 {
+  background: linear-gradient(135deg, #1f2937 0%, #6b7280 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme="light"] .tiptap h3 { color: #1f2937; }
+[data-theme="light"] .tiptap h4 { color: #374151; }
+[data-theme="light"] .tiptap p { color: #374151; }
+[data-theme="light"] .tiptap strong { color: #111827; }
+[data-theme="light"] .tiptap em { color: #4b5563; }
+[data-theme="light"] .tiptap s { color: #9ca3af; }
+[data-theme="light"] .tiptap ul,
+[data-theme="light"] .tiptap ol { color: #374151; }
+[data-theme="light"] .tiptap li::marker { color: #6b7280; }
+
+[data-theme="light"] .tiptap code {
+  background: #f3f4f6;
+  color: #059669;
+}
+
+[data-theme="light"] .tiptap pre {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+[data-theme="light"] .tiptap pre code {
+  background: transparent;
+  color: #059669;
+}
+
+[data-theme="light"] .tiptap .code-block-with-toolbar__pre .code-block-with-toolbar__code {
+  background: transparent;
+  color: #059669;
+}
+
+[data-theme="light"] .tiptap blockquote {
+  border-left: 3px solid #d1d5db;
+  color: #6b7280;
+}
+
+[data-theme="light"] .tiptap a {
+  color: #2563eb;
+  text-decoration-color: #93c5fd;
+}
+
+[data-theme="light"] .tiptap hr {
+  border-color: #e5e7eb;
+}
+
+[data-theme="light"] .tiptap mark {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* ── Light theme: code block toolbar overrides ── */
+[data-theme="light"] .code-block-with-toolbar {
+  border-color: #e5e7eb !important;
+  background: #f9fafb !important;
+}
+[data-theme="light"] .code-block-with-toolbar > div:first-child {
+  border-color: #e5e7eb !important;
+  background: #f3f4f6 !important;
+}
+[data-theme="light"] .code-block-with-toolbar .code-block-with-toolbar__pre {
+  background: #f9fafb !important;
+}
+[data-theme="light"] .code-block-with-toolbar button {
+  color: #6b7280 !important;
+}
+[data-theme="light"] .code-block-with-toolbar button:hover {
+  background: #e5e7eb !important;
+  color: #374151 !important;
 }
 

@@ -5,6 +5,7 @@ import { TopBar } from './components/TopBar'
 import { EditorPane } from './components/EditorPane'
 import './index.css'
 import { Auth } from './components/Auth'
+import { getColors } from './theme'
 import {
   Star,
   Heading1,
@@ -22,7 +23,20 @@ import {
   Copy,
   ClipboardPaste,
   TextSelect,
+  Palette,
+  ChevronRight,
 } from 'lucide-react'
+
+const TEXT_COLORS = [
+  { label: 'Red',     color: '#ef4444' },
+  { label: 'Orange',  color: '#f97316' },
+  { label: 'Yellow',  color: '#eab308' },
+  { label: 'Green',   color: '#22c55e' },
+  { label: 'Blue',    color: '#3b82f6' },
+  { label: 'Purple',  color: '#a855f7' },
+  { label: 'Pink',    color: '#ec4899' },
+  { label: 'Gray',    color: '#6b7280' },
+]
 
 const FORMAT_MENU_ICON = {
   h1: Heading1,
@@ -40,6 +54,8 @@ const FORMAT_MENU_ICON = {
   copy: Copy,
   paste: ClipboardPaste,
   selectAll: TextSelect,
+  textColor: Palette,
+  clearColor: Eraser,
 }
 
 /** Unified format menu: slash (/) and right-click on selection */
@@ -63,6 +79,11 @@ const FORMAT_MENU_GROUPS = [
       { label: 'Strikethrough', command: 'strike' },
       { label: 'Highlight', command: 'highlight' },
     ],
+  },
+  {
+    id: 'color',
+    title: null,
+    items: [{ label: 'Text Color', command: 'textColor', hasSubmenu: true }],
   },
   {
     id: 'lists',
@@ -98,8 +119,8 @@ const FORMAT_MENU_FLAT = FORMAT_MENU_GROUPS.flatMap((g) => g.items)
 /** Gap from anchor; panel = header strip + list (max 5 option rows) + padding */
 const FORMAT_MENU_GAP = 8
 const FORMAT_MENU_HEADER_STRIP_PX = 56
-/** ~5 option rows visible; rest scrolls (section labels scroll with list) */
-const FORMAT_MENU_LIST_MAX_PX = 220
+/** ~7 option rows visible; rest scrolls (section labels scroll with list) */
+const FORMAT_MENU_LIST_MAX_PX = 300
 const FORMAT_MENU_PANEL_ESTIMATE = FORMAT_MENU_HEADER_STRIP_PX + FORMAT_MENU_LIST_MAX_PX + 20
 
 function getFormatMenuPlacement(anchor) {
@@ -141,8 +162,9 @@ function getSidebarContextMenuItems(item) {
     ]
   }
   if (item.type === 'note') {
+    const isFav = item.note?.is_favorite
     return [
-      { action: 'favorite', label: 'Add to Favourites', showStar: true },
+      { action: 'favorite', label: isFav ? 'Remove from Favourites' : 'Add to Favourites', showStar: true },
       { action: 'rename', label: 'Rename', showStar: false },
       { action: 'delete', label: 'Delete', danger: true },
     ]
@@ -180,7 +202,19 @@ function App() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [mobileView, setMobileView] = useState('sidebar')
   const [selectedNoteIds, setSelectedNoteIds] = useState([])
+  const [theme, setTheme] = useState(() => localStorage.getItem('app-theme') || 'dark')
   const isDraggingRef = useRef(false)
+  const colorSubmenuBtnRef = useRef(null)
+  const [colorSubmenu, setColorSubmenu] = useState(null)
+  const c = getColors(theme)
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark'
+      localStorage.setItem('app-theme', next)
+      return next
+    })
+  }, [])
   const MIN_SIDEBAR = 180
   const MAX_SIDEBAR = 480
   /** Must match TopBar + Sidebar header row (`h-14`) for the full-width divider */
@@ -194,6 +228,10 @@ function App() {
     mql.addEventListener('change', handler)
     return () => mql.removeEventListener('change', handler)
   }, [])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 
   // ── Auth ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -328,6 +366,7 @@ function App() {
       'numbered': () => chain.toggleOrderedList().run(),
       'code': () => chain.toggleCodeBlock().run(),
       'clear': () => chain.clearNodes().unsetAllMarks().run(),
+      'clearColor': () => chain.unsetColor().run(),
       'copy': () => {
         runAfterMenuClose(() => {
           if (!editor) return
@@ -381,7 +420,13 @@ function App() {
         })
       },
     }
-    if (actions[command]) actions[command]()
+    if (command === 'textColor') return
+    if (actions[command]) {
+      actions[command]()
+    } else if (command.startsWith('color-')) {
+      chain.setColor(command.slice(6)).run()
+    }
+    setColorSubmenu(null)
     setMenu(null)
   }
 
@@ -486,6 +531,7 @@ function App() {
   useEffect(() => {
     setMenu(null)
     setSlashMenuIndex(0)
+    setColorSubmenu(null)
     slashInsertPosRef.current = null
   }, [selectedNoteId, selectedFolderId, activeTab, sidebarOpen, search])
 
@@ -683,7 +729,7 @@ function App() {
     setOpenFolders((prev) => prev.includes(folderId) ? prev.filter((id) => id !== folderId) : [...prev, folderId])
   }
 
-  const clearMenus = () => { closeSidebarContext(); setMenu(null) }
+  const clearMenus = () => { closeSidebarContext(); setMenu(null); setColorSubmenu(null) }
 
   const formatMenuPopoverRef = useRef(null)
   const [formatMenuMeasuredPos, setFormatMenuMeasuredPos] = useState(null)
@@ -723,8 +769,8 @@ function App() {
   // ── Early returns ─────────────────────────────────────────────────
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f0f0f]">
-        <div className="text-slate-400 text-sm">Loading...</div>
+      <div className="flex min-h-screen items-center justify-center" style={{ background: c.rootBg }}>
+        <div className="text-sm" style={{ color: c.textMuted }}>Loading...</div>
       </div>
     )
   }
@@ -733,15 +779,13 @@ function App() {
 
   // ── Render ────────────────────────────────────────────────────────
   return (
-  // ✅ CHANGED: h-screen → height:100dvh (fixes mobile browser bar)
-  <div className="flex overflow-hidden text-[#c9c9c9]"
-    style={{ background: '#0f0f0f', height: '100dvh' }}>
+  <div className="flex overflow-hidden"
+    style={{ background: c.rootBg, color: c.text, height: '100dvh' }}>
     <div className="relative flex w-full h-full" onClick={clearMenus}>
-      {/* One horizontal rule under the header row — hidden on mobile */}
       {!isMobile && (
         <div
-          className="pointer-events-none absolute left-0 right-0 z-20 h-px bg-[#333333]"
-          style={{ top: HEADER_ROW_PX }}
+          className="pointer-events-none absolute left-0 right-0 z-20 h-px"
+          style={{ top: HEADER_ROW_PX, background: c.border }}
           aria-hidden
         />
       )}
@@ -781,27 +825,28 @@ function App() {
           isMobile={isMobile}
           onChangeSearch={setSearch}
           onLogout={handleLogout}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
       </div>
 
-      {/* Drag handle — desktop only */}
       {!isMobile && sidebarOpen && (
         <div
           className="flex-shrink-0 w-1 cursor-col-resize flex items-center justify-center group"
-          style={{ background: '#1a1a1a' }}
+          style={{ background: c.mainBg }}
           onMouseDown={handleDragStart}
           onTouchStart={handleTouchStart}
         >
           <div
             className="w-0.5 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ background: '#444444' }}
+            style={{ background: c.dragHandle }}
           />
         </div>
       )}
 
       <main
-        className="flex flex-1 flex-col bg-[#1a1a1a] min-h-0 overflow-hidden min-w-0"
-        style={{ display: isMobile && mobileView !== 'editor' ? 'none' : undefined }}
+        className="flex flex-1 flex-col min-h-0 overflow-hidden min-w-0"
+        style={{ background: c.mainBg, display: isMobile && mobileView !== 'editor' ? 'none' : undefined }}
       >
         <TopBar
           notes={notes}
@@ -817,6 +862,8 @@ function App() {
           selectedNote={selectedNote}
           onToggleFavorite={handleToggleFavorite}
           onDeleteNote={handleDeleteNote}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
         <EditorPane
           loading={loading}
@@ -833,19 +880,22 @@ function App() {
           onToggleFavorite={handleToggleFavorite}
           onDeleteNote={handleDeleteNote}
           isMobile={isMobile}
+          theme={theme}
         />
       </main>
     </div>
 
-    {/* Sidebar context menu — unchanged */}
     {sidebarContext && (
         <div
-          className="fixed z-40 min-w-[11rem] rounded-md border border-[#333333] bg-[#1a1a1a] py-1 px-0.5 text-[13px] shadow-xl"
-          style={{ top: sidebarContext.y, left: sidebarContext.x, color: '#e8e8e8' }}
+          className="fixed z-40 min-w-[11rem] rounded-md py-1 px-0.5 text-[13px] shadow-xl"
+          style={{ top: sidebarContext.y, left: sidebarContext.x, color: c.textBright, background: c.contextBg, border: `1px solid ${c.border}` }}
           onClick={(e) => e.stopPropagation()}
           role="menu"
           aria-label="Note and folder actions"
         >
+          <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: c.textMuted }}>
+            Actions
+          </p>
           {sidebarMenuEntries.map((entry, i) => {
             const active = sidebarContextMenuIndex === i
             return (
@@ -855,16 +905,22 @@ function App() {
                 role="menuitem"
                 className={[
                   'flex w-full items-center rounded-md px-3 py-2 text-left transition-colors',
-                  active
-                    ? 'bg-[#2a2a2a] text-white'
-                    : entry.danger
-                      ? 'text-rose-400 hover:bg-[#353535] hover:text-rose-300'
-                      : 'text-[#e0e0e0] hover:bg-[#353535] hover:text-[#f9fafb]',
                   entry.showStar ? 'justify-between gap-2' : '',
                 ].filter(Boolean).join(' ')}
-                onMouseEnter={() => {
+                style={
+                  active
+                    ? { background: c.contextHover, color: c.textHeading }
+                    : entry.danger
+                      ? { color: c.danger }
+                      : { color: c.textBright }
+                }
+                onMouseEnter={(e) => {
                   sidebarContextMenuIndexRef.current = i
                   setSidebarContextMenuIndex(i)
+                  if (!active) e.currentTarget.style.background = c.contextHoverAlt
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.background = 'transparent'
                 }}
                 onClick={() => applySidebarAction(entry.action)}
               >
@@ -880,22 +936,21 @@ function App() {
     {menu && formatMenuStylePos && (
       <div
         ref={formatMenuPopoverRef}
-        className="format-menu-popover fixed z-50 w-[min(18rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-[#333333] bg-[#1a1a1a] py-1.5 shadow-2xl shadow-black/40"
+        className="format-menu-popover fixed z-50 w-[min(18rem,calc(100vw-1rem))] overflow-hidden rounded-xl py-1.5 shadow-2xl shadow-black/40"
         style={{
           top: formatMenuStylePos.top,
           left: formatMenuStylePos.left,
+          background: c.contextBg,
+          border: `1px solid ${c.border}`,
         }}
         onClick={(e) => e.stopPropagation()}
         role="listbox"
         aria-label="Formatting"
       >
-        <div className="border-b border-[#333333] px-3 pb-1.5 pt-0.5">
+        <div className="px-3 pb-1.5 pt-0.5" style={{ borderBottom: `1px solid ${c.border}` }}>
           <p className="format-menu-header-title text-[11px] font-semibold uppercase tracking-[0.18em]">
             Formatting
           </p>
-          {/* <p className="text-[11px] text-slate-500">
-            Headings, text, lists, and blocks — same menu for / and right-click
-          </p> */}
         </div>
         <div
           className="scroll-thin overflow-y-auto px-1.5 py-1"
@@ -916,6 +971,7 @@ function App() {
                   const selected = flatIndex === slashMenuIndex
                   const isDanger = item.danger
                   const Icon = FORMAT_MENU_ICON[item.command] ?? Pilcrow
+                  const hasColorSwatch = Boolean(item.colorSwatch)
                   const labelClass = [
                     'format-menu-label',
                     'min-w-0 flex-1 truncate',
@@ -923,7 +979,6 @@ function App() {
                     !selected && item.command === 'highlight' && 'format-menu-label--highlight',
                     !selected && item.command === 'bold' && 'font-semibold',
                     !selected && item.command === 'italic' && 'italic',
-                    !selected && !item.danger && item.command !== 'highlight' && 'text-[#d1d5db]',
                   ]
                     .filter(Boolean)
                     .join(' ')
@@ -935,21 +990,37 @@ function App() {
                     .join(' ')
                   return (
                     <button
+                      ref={item.hasSubmenu ? colorSubmenuBtnRef : undefined}
                       key={`${group.id}-${item.command}-${ii}`}
                       type="button"
                       role="option"
                       aria-selected={selected}
-                      onMouseEnter={() => setSlashMenuIndex(flatIndex)}
-                      onClick={() => applyFormatMenuCommand(item.command)}
+                      onMouseEnter={() => {
+                        setSlashMenuIndex(flatIndex)
+                        if (item.hasSubmenu) {
+                          const rect = colorSubmenuBtnRef.current?.getBoundingClientRect()
+                          if (rect) setColorSubmenu({ top: rect.top, left: rect.right + 4, bottom: rect.bottom })
+                        } else {
+                          setColorSubmenu(null)
+                        }
+                      }}
+                      onClick={() => {
+                        if (item.hasSubmenu) {
+                          const rect = colorSubmenuBtnRef.current?.getBoundingClientRect()
+                          if (rect) setColorSubmenu(prev => prev ? null : { top: rect.top, left: rect.right + 4, bottom: rect.bottom })
+                        } else {
+                          applyFormatMenuCommand(item.command)
+                        }
+                      }}
                       className={[
                         'format-menu-option',
                         'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
                         selected && 'format-menu-option--selected',
-                        !selected && isDanger && 'format-menu-option--danger text-rose-400',
-                        !selected && !isDanger && 'text-[#d1d5db]',
+                        !selected && isDanger && 'format-menu-option--danger',
                       ]
                         .filter(Boolean)
                         .join(' ')}
+                      style={!selected && !isDanger ? { color: c.text } : undefined}
                     >
                       <Icon
                         size={17}
@@ -960,6 +1031,9 @@ function App() {
                       <span className={labelClass}>
                         {item.label}
                       </span>
+                      {item.hasSubmenu && (
+                        <ChevronRight size={14} strokeWidth={2} className="flex-shrink-0 ml-auto opacity-60" />
+                      )}
                     </button>
                   )
                 })}
@@ -967,6 +1041,50 @@ function App() {
             )
           })}
         </div>
+      </div>
+    )}
+
+    {menu && colorSubmenu && (
+      <div
+        className="fixed z-[60] rounded-xl py-2 px-2 shadow-2xl shadow-black/40"
+        style={{
+          top: Math.min(colorSubmenu.top, window.innerHeight - 260),
+          left: Math.min(colorSubmenu.left, window.innerWidth - 180),
+          background: c.contextBg,
+          border: `1px solid ${c.border}`,
+          minWidth: 160,
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onMouseLeave={() => setColorSubmenu(null)}
+      >
+        <p className="format-menu-section-title px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: c.textMuted }}>
+          Pick a color
+        </p>
+        <div className="grid grid-cols-4 gap-1.5 px-1 pb-1.5">
+          {TEXT_COLORS.map((tc) => (
+            <button
+              key={tc.color}
+              type="button"
+              title={tc.label}
+              onClick={() => applyFormatMenuCommand(`color-${tc.color}`)}
+              className="flex items-center justify-center h-8 w-8 rounded-lg transition-transform hover:scale-110"
+              style={{ background: `${tc.color}18`, border: `2px solid ${tc.color}` }}
+            >
+              <span className="rounded-full" style={{ width: 14, height: 14, background: tc.color }} />
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => applyFormatMenuCommand('clearColor')}
+          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors"
+          style={{ color: c.danger }}
+          onMouseEnter={(e) => e.currentTarget.style.background = c.contextHoverAlt}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+        >
+          <Eraser size={14} strokeWidth={2} />
+          Reset color
+        </button>
       </div>
     )}
   </div>
